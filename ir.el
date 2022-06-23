@@ -1,4 +1,4 @@
-;;; ir.el --- Incremental Reading in Emacs -*- lexical-binding: t; -*-
+;;; ir.el --- Incremental Reading -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2022 Adham Omran
 ;;
