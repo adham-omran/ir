@@ -49,10 +49,6 @@
 (defvar ir-db (emacsql-sqlite ir-db-location))
 
 
-;; TODO If not exists
-;;
-;; TODO Templates in :create-table
-
 ;; Design of database
 ;;
 ;; One of my goals is to support as many possible file types as possible. This
