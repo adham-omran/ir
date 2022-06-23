@@ -77,5 +77,88 @@
   (let* ((txt (pdf-view-active-region-text)))
     (kill-new (mapconcat 'identity txt "\n"))))
 
+(defun ir-extract-pdf-tools ()
+  "Create an extract from selection."
+  (interactive)
+  (ir--pdf-view-copy)
+  (pdf-annot-add-highlight-markup-annotation (pdf-view-active-region) "sky blue")
+  ;; Move to the extracts file
+  (ir--create-heading)
+  (yank)
+  ;; Add extract to the database
+  (ir--insert-item (org-id-get) "text"))
+
+                                        ; Read Functions
+(defun ir-read-start ()
+  "Start the reading session."
+  (interactive)
+  "Read the next item in the queue."
+  (ir--open-item (ir--query-closest-time)))
+
+(defun ir-read-next ()
+  "Move to the next item in the queue."
+  (interactive)
+  (ir--compute-new-interval)
+  (ir-read-start))
+
+(defun ir-read-finish ()
+  "Finish the reading sesssion."
+  (interactive)
+  (ir--compute-new-interval))
+
+
+
+                                        ; Navigation Function
+;; TODO Find pdf. Query in db for path.
+;; TODO Find heading of open pdf. Use the full path to compare against db.
+
+
+                                        ; Editing Functions
+;; TODO Create (ir-change-priority id)
+
+
+                                        ; View & Open Functions
+;; TODO View all <type> function.
+(defun ir--list-type (&optional type)
+  "Retrun a list of items with a type. TYPE optional."
+  (if (eq type nil)
+      (progn
+        (let ((type (completing-read "Choose type: " ir--list-of-unique-types)))
+          (emacsql ir-db
+                   [:select *
+                    :from ir
+                    :where (= type $s1)]
+                   type)))
+    (progn
+        (emacsql ir-db
+                 [:select *
+                  :from ir
+                  :where (= type $s1)]
+                 type))))
+
+(defun ir--list-unique-types ()
+  "Return a list of every unique type."
+  (emacsql ir-db
+           [:select :distinct [type]
+            :from ir]))
+
+(defun ir--list-paths-of-type (list)
+  "Return the nth element in a list of lists (LIST)."
+  (let (result)
+  (dolist (item list result)
+    (push (nth 6 item) result))))
+
+(defun ir-open-pdf ()
+  "Open a pdf from those in the `ir-db'."
+  (interactive)
+  (ir--list-paths-of-type (ir--list-type "pdf"))
+  (let ((file (completing-read "Choose pdf: " (ir--list-paths-of-type (ir--list-type "pdf")))))
+    (find-file file)))
+
+
+
+;; TODO Function to select a pdf from the database and open that pdf.
+
+
 (provide 'ir)
 ;;; ir.el ends here
