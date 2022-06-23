@@ -19,22 +19,23 @@
 ;;
 ;;; Code:
 
-(setq ir--table-list '("ir_extracts" "ir_material_pdf"))
+(setq ir--table-list '("ir"))
 
-(defun ir-db-helper-select-all (table)
+(defun ir-helper-select-all (table)
   "Select all rows from TABLE."
   (interactive (list (completing-read "Choose: " ir--table-list)))
   (message "%s" (emacsql ir-db [:select *
                                 :from $r1]
                          table)))
 
-(defun ir-db-helper-drop-table (table)
+(defun ir-helper-drop-table (table)
   "Drop TABLE."
   (interactive (list (completing-read "Choose: " ir--table-list)))
   (emacsql ir-db [:drop :table $r1]
            table))
 
-(defun ir-db-helper-find-item-from-id ()
+(defun ir-helper-find-item-from-id ()
+  "Find the item in the db based on the org-id in context."
   (interactive)
   (message "%s" (nth 0 (ir--find-item (org-id-get)))))
 
