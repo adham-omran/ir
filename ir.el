@@ -14,61 +14,183 @@
 ;; This file is not part of GNU Emacs.
 ;;
 ;;; Commentary:
-;;
+;; This package provides the features of Incremental Reading inside the Emacs
+;; ecosystem. It leverages utilities from org-mode, pdf-tools, emacsql,
+;; anki-editor and ankifier.
 ;;
 ;;
 ;;; Code:
 (require 'pdf-tools)
 (require 'pdf-annot)
+(require 'emacsql-sqlite)
+(require 'org)
+(require 'org-id)
+(require 'anki-editor)
 
+;; Variables
 
-;; variables
+(defgroup ir nil
+  "Settings for `ir.el'."
+  :link '(url-link "https://github.com/adham-omran/ir")
+  :group 'convenience)
 
-(setq ir--db-location "/home/adham/Dropbox/org/tmp/ir.db")
+(defcustom ir-db-location "~/org/ir.db"
+  "Location of the database."
+  :type '(string))
 
-(setq ir--extracts-location "/home/adham/Dropbox/org/tmp/testing-ir.org")
+(defcustom ir-extracts-location "~/org/ir.org"
+  "Location of the extracts."
+  :type '(string))
+
+(defvar ir--list-of-unique-types (ir--list-unique-types)
+  "List of unique values. Used for selecting a view.")
 
 ;; Database creation
-(defvar ir-db (emacsql-sqlite ir--db-location))
+(defvar ir-db (emacsql-sqlite ir-db-location))
 
-(emacsql ir-db [:create-table ir
-             ([(id text :primary-key) (afactor float)])])
 
-;; Insert some data:
-(emacsql ir-db [:insert :into ir
-             :values (
-                      ["c68d0b2b-992f-4c62-bbcd-a57efaff0cae" 2.0]
-                      )])
+;; TODO If not exists
+;;
+;; TODO Templates in :create-table
 
-(setq tmp-query (emacsql ir-db [:select [id]
-                                    :from ir
-                                    :where (> afactor 1.0)]))
+;; Design of database
+;;
+;; One of my goals is to support as many possible file types as possible. This
+;; would allow one to incrementally learn any piece of material. This also
+;; allows others to easily extend the program by including their favorite file
+;; types and programs to open them.
+;;
+;; One way to query the database is to sort the `ir' table by date, then match
+;; the file type to a function that opens that file type.
+;;
+;; Such files have a path which is inserted in the path column.
+;;
+;; Example
+;; File type - Method - Description.
+;; text - org-id-find - A simple org heading.
+;; pdf - dired-find-file - A pdf file.
+;; mp4 - TODO - A video.
 
-;; functions
+(emacsql ir-db [:create-table :if-not-exists ir
+                ([(id text :primary-key)
+                  (afactor float :default 1.5)
+                  (interval integer :default 1)
+                  (priority integer :default 50)
+                  (date integer)
+                  (type text :not-null)
+                  (path text)
+                  ])])
 
-(defun ir--get-id-from-result (query)
-  "Get dirty id from QUERY and clean it."
-  (substring (substring (format "%s" query) 2 -2)))
-
-(defun ir--go-to-extract (id)
-  "Open a buffer with the extract of ID."
-  (org-id-open id))
-
-(ir--go-to-extract (ir--get-id-from-result tmp-query))
-
-(defun ir-extract-pdf-tools ()
-  "Create an extract from selection."
-  (interactive)
-  (ir--pdf-view-copy)
-  (pdf-annot-add-highlight-markup-annotation (pdf-view-active-region) "sky blue")
-  ; Move to the extracts file
-  (org-open-file ir--extracts-location)
+(defun ir--create-heading ()
+  "Create heading with org-id."
+  (org-open-file ir-extracts-location)
   (goto-char (point-max))
   (insert "\n") ; for safety
+  ;; TODO Better heading name.
   (insert "* " (format "%s" (current-time)) "\n")
-  (yank)
   (org-id-get-create)
   (org-narrow-to-subtree))
+
+                                        ; Material Import Functions
+                                        ; Importing a PDF
+(defun ir-add-pdf (path)
+  "Select and add a PATH pdf file to the databse."
+  (interactive (list (read-file-name "Select PDF to add: ")))
+  ;; First check if the file is a pdf. Second check if the file has already been
+  ;; added.
+  (if (equal (file-name-extension path) "pdf")
+      (if (ir--check-duplicate-path path)
+          (message "File %s is already in the database." path)
+        (progn
+        (ir--create-heading)
+        (ir--insert-item (org-id-get) "pdf" path))
+        (find-file path))
+    (message "File %s is not a pdf file." path)))
+
+
+                                        ; Database Functions
+(defun ir--open-item (list)
+  "Opens an item given a LIST. Usually from a query."
+  (let ((item-id (nth 0 list))
+        (item-type (nth 5 list))
+        (item-path (nth 6 list)))
+    ;; Body
+    (when (equal item-type "text")
+      (find-file (org-id-find-id-file item-id))
+      (widen)
+      (goto-char (cdr (org-id-find item-id)))
+      (forward-line 4)
+      (org-narrow-to-subtree))
+    (when (equal item-type "pdf")
+      (find-file item-path))
+    ))
+
+(defun ir--query-closest-time ()
+  "Query `ir-db' for the most due item."
+  (nth 0 (emacsql ir-db
+                  [:select *
+                   :from ir
+                   :order-by date])))
+
+(defun ir--check-duplicate-path (path)
+  "Check `ir-db' for matching PATH."
+  (emacsql ir-db
+           [:select *
+            :from ir
+            :where (= path $s1)]
+           path))
+
+(defun ir--insert-item (id type &optional path)
+  "Insert item into `ir' database with TYPE and ID."
+  (unless path (setq path nil)) ;; Check if a path has been supplied.
+  (emacsql ir-db [:insert :into ir [id date type path]
+                  :values (
+                           [$s1 $s2 $s3 $s4])]
+           id
+           (round (float-time))
+           type
+           path))
+
+(defun ir--find-item (id)
+  "Return a list given ID."
+  (emacsql ir-db [:select *
+                  :from ir
+                  :where (= $s1 id)]
+           id))
+
+(defun ir--update-value (id column value)
+  "Update the VALUE for the item ID with at COLUMN."
+  (emacsql ir-db [:update ir
+                  :set $r3 := $v1
+                  :where (= $v2 id)]
+           (list (vector value))
+           (list (vector id))
+           column))
+
+
+                                        ; Algorithm Functions
+(defun ir--compute-new-interval ()
+  "Compute a new interval for the item of ID.
+Part of the ir-read function."
+  (org-id-copy)
+  (let (
+        (item (nth 0 (ir--find-item (car kill-ring)))))
+    (let (
+          (id (nth 0 item))
+          (old-a (nth 1 item))
+          (old-interval (nth 2 item))
+          (old-date (nth 3 item)))
+      (ir--update-value id "interval" (round (* old-interval (+ old-a 0.08))))
+      (ir--update-value id "afactor" (+ old-a 0.08))
+      (ir--update-value id "date" (+ old-date (* 24 60 60 old-interval))))))
+
+                                        ; Extract Functionality
+                                        ; From pdf-tools
+;;; TODO Children behavior. There are N possible ideas:
+;; 1. Whenever an extract is made, move to the heading containing the id of the
+;; pdf file. Create a subheading for each cloze.
+;;
+;; 2. Have no children.
 
 (defun ir--pdf-view-copy ()
   "Copy the region to the `kill-ring'."
