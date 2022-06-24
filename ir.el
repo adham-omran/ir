@@ -119,6 +119,11 @@
         (find-file path))
     (message "File %s is not a pdf file." path)))
 
+;; TODO Import from Zotero
+;;
+;; This would greatly enhance the ability to add PDFs. It'd also seal the deal
+;; for complete path as the file name.
+
 
                                         ; Database Functions
 (defun ir--open-item (list)
@@ -167,8 +172,6 @@ single item to return the value of a column from."
                value
                column))))
 
-;; Upgrading query-for-path. Make it retun the intended column.
-
 (defun ir--return-column (column query)
   "Using a plist, access any value from a QUERY search in COLUMN.
 Prime use case it to get the id of a particular query. Note this
@@ -193,13 +196,6 @@ only access the first result."
            (round (float-time))
            type
            path))
-
-(defun ir--find-item (id)
-  "Return a list given ID."
-  (emacsql ir-db [:select *
-                  :from ir
-                  :where (= $s1 id)]
-           id))
 
 (defun ir--update-value (id column value)
   "Update the VALUE for the item ID with at COLUMN."
@@ -231,27 +227,10 @@ Part of the ir-read function."
     (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
     (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
 
-  ;; (let (
-  ;;       (item (nth 0 (ir--find-item (org-id-get)))))
-  ;;   (let (
-  ;;         (id (nth 0 item))
-  ;;         (old-a (nth 1 item))
-  ;;         (old-interval (nth 2 item))
-  ;;         (old-date (nth 3 item)))
-  ;;     (ir--update-value id "interval" (round (* old-interval (+ old-a 0.08))))
-  ;;     (ir--update-value id "afactor" (+ old-a 0.08))
-  ;;     (ir--update-value id "date" (+ old-date (* 24 60 60 old-interval))))))
-
                                         ; Extract Functionality
                                         ; From pdf-tools
 
-;; TODO Just extract but leave pdf
-;;; TODO Children behavior. There are N possible ideas:
-;; 1. Whenever an extract is made, move to the heading containing the id of the
-;; pdf file. Create a subheading for each cloze.
-;;
-;; 2. Have no children.
-
+;; TODO Just extract from pdf but don't change buffer.
 (defun ir--pdf-view-copy ()
   "Copy the region to the `kill-ring'."
   (interactive)
