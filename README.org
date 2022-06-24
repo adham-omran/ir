@@ -1,6 +1,4 @@
-#+title: Readme
-
-* ir.el - Incremental Reading
+#+title: ir.el - Incremental Reading
 
 The term is orginally coined by Piotr Wozniak and he describes it as:
 #+begin_quote
@@ -17,7 +15,7 @@ Extraction from PDFs.
 The current way to create questions and clozes out of the extracts is to write
 them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I want to improve on this in the future.
 
-** What's Next?
+* What's Next?
 - [ ] Implement extraction from org-mode files.
 - [ ] Implement a more user friendly way to create questions.
 - [ ] Implement features to get results in a more easy to read form.
@@ -62,4 +60,4 @@ I use a simplified SM2 algorithm to calculate the intervals.
 \(\text{New Interval} = \text{round}(\text{Old Interval} \times
 \text{A Factor})\)
 
-\(\text{New Date} = \text{Old Date} + \text{New Interval}\)
+$\text{New Date} = \text{Old Date} + \text{New Interval}$
