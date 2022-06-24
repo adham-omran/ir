@@ -52,24 +52,6 @@
 (defvar ir-db (emacsql-sqlite ir-db-location))
 
 
-;; Design of database
-;;
-;; One of my goals is to support as many possible file types as possible. This
-;; would allow one to incrementally learn any piece of material. This also
-;; allows others to easily extend the program by including their favorite file
-;; types and programs to open them.
-;;
-;; One way to query the database is to sort the `ir' table by date, then match
-;; the file type to a function that opens that file type.
-;;
-;; Such files have a path which is inserted in the path column.
-;;
-;; Example
-;; File type - Method - Description.
-;; text - org-id-find - A simple org heading.
-;; pdf - dired-find-file - A pdf file.
-;; mp4 - TODO - A video.
-
 (emacsql ir-db [:create-table :if-not-exists ir
                 ([(id text :primary-key)
                   (afactor real :default 1.5)
