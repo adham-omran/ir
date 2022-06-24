@@ -44,6 +44,9 @@
 (defvar ir--list-of-unique-types (ir--list-unique-types)
   "List of unique values. Used for selecting a view.")
 
+(defvar ir--p-column-names '(id 0 afactor 1 interval 2 priority 3 date 4
+                            type 5 path 6))
+
 ;; Database creation
 (defvar ir-db (emacsql-sqlite ir-db-location))
 
@@ -68,7 +71,7 @@
 
 (emacsql ir-db [:create-table :if-not-exists ir
                 ([(id text :primary-key)
-                  (afactor float :default 1.5)
+                  (afactor real :default 1.5)
                   (interval integer :default 1)
                   (priority integer :default 50)
                   (date integer)
@@ -76,13 +79,26 @@
                   (path text)
                   ])])
 
+; TODO Improve how headings are created.
 (defun ir--create-heading ()
   "Create heading with org-id."
   (org-open-file ir-extracts-location)
-  (goto-char (point-max))
-  (insert "\n") ; for safety
+  ;; (goto-char (point-max))
+  ;; (insert "\n") ; for safety
+  (org-insert-heading)
   ;; TODO Better heading name.
-  (insert "* " (format "%s" (current-time)) "\n")
+  (insert (format "%s" (current-time)) "\n")
+  (org-id-get-create)
+  (org-narrow-to-subtree))
+
+(defun ir--create-subheading ()
+  "Create heading with org-id."
+  (org-open-file ir-extracts-location)
+  ;; (goto-char (point-max))
+  ;; (insert "\n") ; for safety
+  (org-insert-subheading 1)
+  ;; TODO Better heading name.
+  (insert (format "%s" (current-time)) "\n")
   (org-id-get-create)
   (org-narrow-to-subtree))
 
@@ -111,21 +127,46 @@
         (item-path (nth 6 list)))
     ;; Body
     (when (equal item-type "text")
-      (find-file (org-id-find-id-file item-id))
-      (widen)
-      (goto-char (cdr (org-id-find item-id)))
-      (forward-line 4)
-      (org-narrow-to-subtree))
+      (ir-navigate-to-heading item-id))
     (when (equal item-type "pdf")
-      (find-file item-path))
-    ))
+      (find-file item-path))))
 
 (defun ir--query-closest-time ()
   "Query `ir-db' for the most due item."
   (nth 0 (emacsql ir-db
                   [:select *
                    :from ir
-                   :order-by date])))
+                   :order-by date :desc])))
+
+(defun ir--query-by-column (value column &optional return-item)
+  "Search for VALUE in COLUMN.
+
+If RETURN-ITEM is non-nil, returns the first result. I have this
+to avoid writing (nth 0) in all return functions that want a
+single item to return the value of a column from."
+  (if return-item
+      (progn
+        (nth 0(emacsql ir-db
+                       [:select *
+                        :from ir
+                        :where (= $s1 $i2)]
+                       value
+                       column)))
+    (progn
+      (emacsql ir-db
+               [:select *
+                :from ir
+                :where (= $s1 $i2)]
+               value
+               column))))
+
+;; Upgrading query-for-path. Make it retun the intended column.
+
+(defun ir--return-column (column query)
+  "Using a plist, access any value from a QUERY search in COLUMN.
+Prime use case it to get the id of a particular query. Note this
+only access the first result."
+  (nth (plist-get ir--p-column-names column) query))
 
 (defun ir--check-duplicate-path (path)
   "Check `ir-db' for matching PATH."
@@ -181,8 +222,7 @@ Part of the ir-read function."
         (old-date (ir--return-column 'date item)))
     (ir--update-value (org-id-get) "interval" (round (* old-interval (+ old-a 0.08))))
     (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
-    (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval)))
-    )))
+    (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
 
   ;; (let (
   ;;       (item (nth 0 (ir--find-item (org-id-get)))))
@@ -217,8 +257,9 @@ Part of the ir-read function."
   (interactive)
   (ir--pdf-view-copy)
   (pdf-annot-add-highlight-markup-annotation (pdf-view-active-region) "sky blue")
-  ;; Move to the extracts file
-  (ir--create-heading)
+  ;; Move to the pdf file's heading
+  (ir-navigate-to-heading)
+  (ir--create-subheading)
   (yank)
   ;; Add extract to the database
   (ir--insert-item (org-id-get) "text"))
@@ -244,9 +285,50 @@ Part of the ir-read function."
 
 
                                         ; Navigation Function
-;; TODO Find pdf. Query in db for path.
-;; TODO Find heading of open pdf. Use the full path to compare against db.
+;; TODO Find pdf. Query in db for path. To do this, I can check if the path of
+;; the ID is non-nil, if it's non-nil, then I can navigate to that path with a
+;; simple open operation.
+(defun ir-navigate-to-source ()
+  ;; (interactive)
+  "Navigate to the source of a heading if one exists.")
 
+
+;;
+;; This exposed the problem of storing paths with ~ vs /home/USER/
+;;
+;; TODO Rework navigation functions.
+;;
+;; DONE Write an API to find stuff
+;;
+;; DONE Clearly define what an `item' and a `query' are.
+;;
+;; I think what I want to have is a find by each column. And a function that
+;; moves to the heading given an ID.
+;;
+;; DONE Define what an ir-query function does.
+;;
+;; TODO Define all the ir-<subset> functions.
+
+;; DONE Find heading of open pdf. Use the full path to compare against db.
+(defun ir-navigate-to-heading (&optional id)
+  "Navigate to the heading given ID."
+  (interactive)
+  (if (equal (file-name-extension (buffer-file-name)) "pdf")
+      (progn
+        (setq id
+              (ir--return-column 'id ;; Uses the results of `'ir--query-by-column'
+                                 ;; to return only the 'id value
+               (ir--query-by-column ;; Results in an item of the form ("id"
+                                    ;; afactor ... path)
+
+                ;; TODO Figure out a regex that works. Or save all paths as
+                ;; complete.
+                (s-replace "/home/adham/" "~/" (format "%s" (buffer-file-name)))
+                'path t)))))
+  (find-file (org-id-find-id-file id))
+  (widen) ;; In case of narrowing by previous functions.
+  (goto-char (cdr (org-id-find id)))
+  (org-narrow-to-subtree))
 
                                         ; Editing Functions
 ;; TODO Create (ir-change-priority id)
@@ -289,11 +371,6 @@ Part of the ir-read function."
   (ir--list-paths-of-type (ir--list-type "pdf"))
   (let ((file (completing-read "Choose pdf: " (ir--list-paths-of-type (ir--list-type "pdf")))))
     (find-file file)))
-
-
-
-;; TODO Function to select a pdf from the database and open that pdf.
-
 
 (provide 'ir)
 ;;; ir.el ends here
