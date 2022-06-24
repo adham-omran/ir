@@ -133,11 +133,17 @@
       (find-file item-path))))
 
 (defun ir--query-closest-time ()
-  "Query `ir-db' for the most due item."
+  "Query `ir-db' for the most due item.
+
+The order is first by time from smallest number (closest date) to
+largest number (farthest date)."
+  ;; TODO Refactor to use ir-return.
+  ;;
+  ;; TODO Enable sorting by priority.
   (nth 0 (emacsql ir-db
                   [:select *
                    :from ir
-                   :order-by date :desc])))
+                   :order-by date])))
 
 (defun ir--query-by-column (value column &optional return-item)
   "Search for VALUE in COLUMN.
@@ -269,7 +275,7 @@ Part of the ir-read function."
 (defun ir-read-start ()
   "Start the reading session."
   (interactive)
-  "Read the next item in the queue."
+  ;; TODO How to handle not finding an item.
   (ir--open-item (ir--query-closest-time)))
 
 (defun ir-read-next ()
