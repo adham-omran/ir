@@ -25,6 +25,7 @@
 (require 'emacsql-sqlite)
 (require 'org)
 (require 'org-id)
+(require 's)
 
 ;; Variables
 
