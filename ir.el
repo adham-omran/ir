@@ -167,20 +167,38 @@
 (defun ir--compute-new-interval ()
   "Compute a new interval for the item of ID.
 Part of the ir-read function."
-  (org-id-copy)
+  ;; The way I have it compute new interval for a pdf file is as follows.
+  ;;
+  ;; Navigate to the header of the pdf file. Use its ID to update the pdf's
+  ;; interval. This makes sense because the PDF is just another ID in the db.
+  (if (equal (file-name-extension (buffer-file-name)) "pdf")
+      (ir-navigate-to-heading))
   (let (
-        (item (nth 0 (ir--find-item (car kill-ring)))))
-    (let (
-          (id (nth 0 item))
-          (old-a (nth 1 item))
-          (old-interval (nth 2 item))
-          (old-date (nth 3 item)))
-      (ir--update-value id "interval" (round (* old-interval (+ old-a 0.08))))
-      (ir--update-value id "afactor" (+ old-a 0.08))
-      (ir--update-value id "date" (+ old-date (* 24 60 60 old-interval))))))
+      (item (ir--query-by-column (org-id-get) 'id t)))
+  (let (
+        (old-a (ir--return-column 'afactor item))
+        (old-interval (ir--return-column 'interval item))
+        (old-date (ir--return-column 'date item)))
+    (ir--update-value (org-id-get) "interval" (round (* old-interval (+ old-a 0.08))))
+    (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
+    (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval)))
+    )))
+
+  ;; (let (
+  ;;       (item (nth 0 (ir--find-item (org-id-get)))))
+  ;;   (let (
+  ;;         (id (nth 0 item))
+  ;;         (old-a (nth 1 item))
+  ;;         (old-interval (nth 2 item))
+  ;;         (old-date (nth 3 item)))
+  ;;     (ir--update-value id "interval" (round (* old-interval (+ old-a 0.08))))
+  ;;     (ir--update-value id "afactor" (+ old-a 0.08))
+  ;;     (ir--update-value id "date" (+ old-date (* 24 60 60 old-interval))))))
 
                                         ; Extract Functionality
                                         ; From pdf-tools
+
+;; TODO Just extract but leave pdf
 ;;; TODO Children behavior. There are N possible ideas:
 ;; 1. Whenever an extract is made, move to the heading containing the id of the
 ;; pdf file. Create a subheading for each cloze.
