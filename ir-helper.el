@@ -1,4 +1,4 @@
-;;; ir-db-helper-functions.el --- Help in working with the db -*- lexical-binding: t; -*-
+;;; ir-helper.el --- Help in working with the db -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2022 Adham Omran
 ;;
@@ -18,26 +18,25 @@
 ;;
 ;;
 ;;; Code:
-
-(setq ir--table-list '("ir"))
+;; (setq ir--table-list '("ir"))
 
 (defun ir-helper-select-all (table)
   "Select all rows from TABLE."
-  (interactive (list (completing-read "Choose: " ir--table-list)))
+  (interactive (list (completing-read "Choose: " "ir")))
   (message "%s" (emacsql ir-db [:select *
                                 :from $r1]
                          table)))
 
 (defun ir-helper-drop-table (table)
   "Drop TABLE."
-  (interactive (list (completing-read "Choose: " ir--table-list)))
+  (interactive (list (completing-read "Choose: " "ir")))
   (emacsql ir-db [:drop :table $r1]
            table))
 
 (defun ir-helper-find-item-from-id ()
   "Find the item in the db based on the org-id in context."
   (interactive)
-  (message "%s" (nth 0 (ir--find-item (org-id-get)))))
+  (message "%s" (ir--query-by-column (org-id-get) 'id t)))
 
 
 (provide 'ir-db-helper-functions)
