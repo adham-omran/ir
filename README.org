@@ -9,11 +9,14 @@ begins with importing articles from electronic sources, e.g. the Internet
 [[https://super-memory.com/help/read.htm#Introduction_to_incremental_reading][Introduction to Incremental Reading]]
 
 This project aims to cover all the useful features of incremental reading. The
-main features I have implemented so far are Scheduling of material and
-Extraction from PDFs.
+main features I have implemented so far are *scheduling of material* and
+*extraction from PDFs*.
 
 The current way to create questions and clozes out of the extracts is to write
 them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I want to improve on this in the future.
+
+* Tutorial
+@TODO
 
 * What's Next?
 - [ ] Implement extraction from org-mode files.
@@ -55,9 +58,9 @@ Example
 | mp4       | @TODO           | A video.              |
 ** Algorithm Design
 
-I use a simplified SM2 algorithm to calculate the intervals.
+I use a simplified SM2 algorithm to calculate the intervals. The A Factor
+increases by 0.08 per repetition.
 
-\(\text{New Interval} = \text{round}(\text{Old Interval} \times
-\text{A Factor})\)
+$\text{New Interval} = \text{round}(\text{Old Interval} \times \text{A Factor})$
 
 $\text{New Date} = \text{Old Date} + \text{New Interval}$
