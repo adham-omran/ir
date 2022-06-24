@@ -2,9 +2,7 @@
 
 The term is orginally coined by Piotr Wozniak and he describes it as:
 #+begin_quote
-Incremental reading is a learning technique that makes it possible to read
-thousands of articles at the same time without getting lost. Incremental reading
-begins with importing articles from electronic sources, e.g. the Internet
+Incremental reading is a learning technique that makes it possible to read thousands of articles at the same time without getting lost. Incremental reading begins with importing articles from electronic sources, e.g. the Internet. The student then extracts the most important fragments of individual articles for further review. Extracted fragments are then converted into questions and answers. These in turn become subject to systematic review and repetition that maximizes the long-term recall.
 #+end_quote
 [[https://super-memory.com/help/read.htm#Introduction_to_incremental_reading][Introduction to Incremental Reading]]
 
