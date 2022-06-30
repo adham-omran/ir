@@ -297,6 +297,9 @@ Part of the ir-read function."
   (ir--insert-item (org-id-get) "text"))
 
                                         ; Read Functions
+;; (Minor mode) ideas
+;;; A session starts a new emcas frame (alike org-noter).
+
 (defun ir-read-start ()
   "Start the reading session."
   (interactive)
@@ -367,6 +370,8 @@ Part of the ir-read function."
 
 
                                         ; View & Open Functions
+;; TODO Use (decode-time (seconds-to-time N))  to get human readable times.
+;;
 ;; TODO View all <type> function.
 (defun ir--list-type (&optional type)
   "Retrun a list of items with a type. TYPE optional."
