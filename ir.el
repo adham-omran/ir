@@ -6,17 +6,16 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: June 22, 2022
-;; Version: 1.0.1
-;; Keywords: abbrev bib c calendar comm convenience data docs emulations extensions faces files frames games hardware help hypermedia i18n internal languages lisp local maint mail matching mouse multimedia news outlines processes terminals tex tools unix vc wp
-;; Homepage: https://github.com/adham/ir
+;; Version: 1.1.0
+;; Keywords: wp, incremental reading
+;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "24.3"))
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
 ;;; Commentary:
 ;; This package provides the features of Incremental Reading inside the Emacs
-;; ecosystem. It leverages utilities from org-mode, pdf-tools, emacsql,
-;; anki-editor and ankifier.
+;; ecosystem.  Enabling one to process thousands of articles and books.
 ;;
 ;;
 ;;; Code:
