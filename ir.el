@@ -61,20 +61,21 @@
                   (path text)
                   ])])
 
-; TODO Improve how headings are created.
+                                        ; TODO Improve how headings are created.
 (defun ir--create-heading ()
-  "Create heading with org-id."
+  "Create heading with an org-id."
   (org-open-file ir-extracts-location)
-  ;; (goto-char (point-max))
-  ;; (insert "\n") ; for safety
-  (org-insert-heading)
+  (widen)
+  (goto-char (point-max))
+  (insert "\n") ; For safety
+  (insert "* ")
   ;; TODO Better heading name.
   (insert (format "%s" (current-time)) "\n")
   (org-id-get-create)
   (org-narrow-to-subtree))
 
 (defun ir--create-subheading ()
-  "Create heading with org-id."
+  "Create subheading with an org-id."
   (org-open-file ir-extracts-location)
   ;; (goto-char (point-max))
   ;; (insert "\n") ; for safety
