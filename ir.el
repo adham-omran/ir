@@ -41,11 +41,11 @@
   "Location of the extracts."
   :type '(string))
 
-(defvar ir--list-of-unique-types (ir--list-unique-types)
+(defvar ir--list-of-unique-types '()
   "List of unique values. Used for selecting a view.")
 
 (defvar ir--p-column-names '(id 0 afactor 1 interval 2 priority 3 date 4
-                            type 5 path 6))
+                                type 5 path 6))
 
 ;; Database creation
 (defvar ir-db (emacsql-sqlite ir-db-location))
