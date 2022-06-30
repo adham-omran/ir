@@ -37,7 +37,7 @@
   "Location of the database."
   :type '(string))
 
-(defcustom ir-extracts-location "~/org/ir.org"
+(defcustom ir-extracts-file "~/org/ir.org"
   "Location of the extracts."
   :type '(string))
 
@@ -64,7 +64,7 @@
                                         ; TODO Improve how headings are created.
 (defun ir--create-heading ()
   "Create heading with an org-id."
-  (org-open-file ir-extracts-location)
+  (org-open-file ir-extracts-file)
   (widen)
   (goto-char (point-max))
   (insert "\n") ; For safety
@@ -76,7 +76,7 @@
 
 (defun ir--create-subheading ()
   "Create subheading with an org-id."
-  (org-open-file ir-extracts-location)
+  (org-open-file ir-extracts-file)
   ;; (goto-char (point-max))
   ;; (insert "\n") ; for safety
   (org-insert-subheading 1)
@@ -258,7 +258,7 @@ Part of the ir-read function."
     (kill-ring-save (region-beginning) (region-end))
     (ir--highlights-add-highlight)
     (deactivate-mark)
-    ;; Check if we're in `ir-extracts-location'.
+    ;; Check if we're in `ir-extracts-file'.
     (if (ir--extracts-location-p)
         (progn
           (org-insert-subheading nil)
@@ -273,14 +273,12 @@ Part of the ir-read function."
 
 (defun ir--extracts-location-p ()
   "Check if we're in the correct location. BUFFER."
-  (equal (buffer-file-name) ir-extracts-location))
+  (equal (buffer-file-name) ir-extracts-file))
 
                                         ; From pdf-tools
 
-;; TODO Just extract from pdf but don't change buffer.
 (defun ir--pdf-view-copy ()
   "Copy the region to the `kill-ring'."
-  (interactive)
   (pdf-view-assert-active-region)
   (let* ((txt (pdf-view-active-region-text)))
     (kill-new (mapconcat 'identity txt "\n"))))
