@@ -473,5 +473,12 @@ Part of the ir-read function."
 ;;; Simply load highlights for every function that vists a heading. And export
 ;;; after every function that highlights.
 
+                                        ; Collection Functions
+;; These funcitons collect text from the web. They are most useful when configured with a DE/WM.
+
+;; TODO ir-collect-from-web-selection
+
+;; TODO ir-collect-from-clipboard: Insert \n then insert clipboard.
+
 (provide 'ir)
 ;;; ir.el ends here
