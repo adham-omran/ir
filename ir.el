@@ -127,7 +127,9 @@
     (when (equal item-type "text")
       (ir-navigate-to-heading item-id))
     (when (equal item-type "pdf")
-      (find-file item-path))))
+      (find-file item-path))
+    (when (equal item-type "web")
+      (browse-url item-path))))
 
 (defun ir--query-closest-time ()
   "Query `ir-db' for the most due item.
