@@ -210,16 +210,71 @@ Part of the ir-read function."
   (if (equal (file-name-extension (buffer-file-name)) "pdf")
       (ir-navigate-to-heading))
   (let (
-      (item (ir--query-by-column (org-id-get) 'id t)))
-  (let (
-        (old-a (ir--return-column 'afactor item))
-        (old-interval (ir--return-column 'interval item))
-        (old-date (ir--return-column 'date item)))
-    (ir--update-value (org-id-get) "interval" (round (* old-interval (+ old-a 0.08))))
-    (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
-    (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
+        (item (ir--query-by-column (org-id-get) 'id t)))
+    (let (
+          (old-a (ir--return-column 'afactor item))
+          (old-interval (ir--return-column 'interval item))
+          (old-date (ir--return-column 'date item)))
+      (ir--update-value (org-id-get) "interval" (round (* old-interval (+ old-a 0.08))))
+      (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
+      (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
 
                                         ; Extract Functionality
+                                        ; From org
+;; This works by taking the portion in the region and creating a new org-id
+;; heading.
+;;
+;;; Cases
+;; 1. We're in the `ir-extracts-location' file which implies the new extracts is
+;; a child of the current extract.
+;;
+;; 2. We're not in the `ir-extracts-location'. I could use the same path
+;; mechanisim I use for pdfs. Create a new org-id heading per file and move to
+;; it when creating an extract from the same file.
+;;
+;; Edge Cases to (2)
+;;
+;; 1. The user does not want to have extracts in another location.
+;; 2. The user is using org-roam.
+;;
+;; TODO Create `ir--extracts-file-p' as a predicate function to check if we're
+;; in the extracts location.
+
+;; TODO Why /not/ make this a general function?
+;; Check if pdf and perform `ir--extract-pdf-tools'?
+
+;; If the file is not a pdf. Clip the selection into the kill ring. Move into
+;; an org-id heading. Create a subheading and paste.
+(defun ir-extract-region ()
+  "Extract from the current active region into appropriate org-id heading."
+  (interactive)
+  (when (equal (file-name-extension (buffer-file-name)) "pdf")
+    (ir--extract-pdf-tools))
+  (catch 'no-region
+    (unless (use-region-p)
+      (throw 'no-region
+             (message "No active region.")))
+
+    (kill-ring-save (region-beginning) (region-end))
+    (ir--highlights-add-highlight)
+    (deactivate-mark)
+    ;; Check if we're in `ir-extracts-location'.
+    (if (ir--extracts-location-p)
+        (progn
+          (org-insert-subheading nil)
+          ;; TODO Better heading name.
+          (insert (format "%s" (current-time)) "\n")
+          (org-id-get-create)
+          (yank)
+          (org-narrow-to-subtree))
+      (progn
+        (ir--create-heading)
+        (yank)))))
+
+(defun ir--extracts-location-p ()
+  "Check if we're in the correct location. BUFFER."
+  (equal (buffer-file-name) ir-extracts-location))
+
                                         ; From pdf-tools
 
 ;; TODO Just extract from pdf but don't change buffer.
@@ -230,9 +285,8 @@ Part of the ir-read function."
   (let* ((txt (pdf-view-active-region-text)))
     (kill-new (mapconcat 'identity txt "\n"))))
 
-(defun ir-extract-pdf-tools ()
+(defun ir--extract-pdf-tools ()
   "Create an extract from selection."
-  (interactive)
   (ir--pdf-view-copy)
   (pdf-annot-add-highlight-markup-annotation (pdf-view-active-region) "sky blue")
   ;; Move to the pdf file's heading
