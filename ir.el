@@ -101,6 +101,13 @@
         (find-file path))
     (message "File %s is not a pdf file." path)))
 
+(defun ir-add-web-article ()
+  "Add URL of a web article to the database."
+  (interactive)
+  (let ((url (read-string "URL: ")))
+    (ir--create-heading)
+    (ir--insert-item (org-id-get) "web" url)))
+
 ;; TODO Import from Zotero
 ;;
 ;; This would greatly enhance the ability to add PDFs. It'd also seal the deal
