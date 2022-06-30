@@ -219,22 +219,24 @@ Part of the ir-read function."
       (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
       (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
 
-                                        ; Extract Functionality
+                                        ; Extract Functions
                                         ; From org
+
 ;; This works by taking the portion in the region and creating a new org-id
 ;; heading.
 ;;
 ;;; Cases
-;; 1. We're in the `ir-extracts-location' file which implies the new extracts is
-;; a child of the current extract.
+;; 1. We're in the `ir-extracts-file' file which implies the new extracts is a
+;; child of the current extract.
 ;;
-;; 2. We're not in the `ir-extracts-location'. I could use the same path
-;; mechanisim I use for pdfs. Create a new org-id heading per file and move to
-;; it when creating an extract from the same file.
+;; 2. We're not in the `ir-extracts-file'. I could use the same path mechanism I
+;; use for PDFs. Create a new org-id heading per file and move to it when
+;; creating an extract from the same file.
 ;;
 ;; Edge Cases to (2)
 ;;
 ;; 1. The user does not want to have extracts in another location.
+;;
 ;; 2. The user is using org-roam.
 ;;
 ;; TODO Create `ir--extracts-file-p' as a predicate function to check if we're
@@ -317,7 +319,7 @@ Part of the ir-read function."
 
 
 
-                                        ; Navigation Function
+                                        ; Navigation Functions
 ;; TODO Find pdf. Query in db for path. To do this, I can check if the path of
 ;; the ID is non-nil, if it's non-nil, then I can navigate to that path with a
 ;; simple open operation.
@@ -435,13 +437,18 @@ Part of the ir-read function."
 (defun ir-open-pdf ()
   "Open a pdf from those in the `ir-db'."
   (interactive)
-  (ir--list-paths-of-type (ir--list-type "pdf"))
   (let ((file (completing-read "Choose pdf: " (ir--list-paths-of-type (ir--list-type "pdf")))))
     (find-file file)))
 
+(defun ir-open-web ()
+  "Open a web article from those in the `ir-db'."
+  (interactive)
+  (let ((file (completing-read "Choose URL: " (ir--list-paths-of-type (ir--list-type "web")))))
+    (browse-url file)))
+
                                         ; Highlighting Functions
 
-(defcustom ir--highlights-file "/home/adham/Dropbox/code/projects/ir/ir-highlights.el"
+(defcustom ir-highlights-file "/home/adham/Dropbox/code/projects/ir/ir-highlights.el"
   "File to store highlights."
   :type '(string))
 
@@ -449,15 +456,14 @@ Part of the ir-read function."
 
 (defun ir--highlights-export ()
   "Exports highlist alist to file."
-  (with-temp-file ir--highlights-file
-    (delete-file ir--highlights-file)
+  (with-temp-file ir-highlights-file
+    (delete-file ir-highlights-file)
     (insert (format "(setq %s '%S)\n" 'ir--highlights-saved (symbol-value 'ir--highlights-saved))))
-  (load ir--highlights-file))
+  (load ir-highlights-file))
 
 (defun ir--highlights-add-highlight ()
   "Add region to the saved highlight hashtable."
   ;; TODO Add the ability to highlight one word.
-  (interactive)
   (let (
         (old-list (gethash (org-id-get) ir--highlights-saved))
         (region (buffer-substring-no-properties (mark) (point))))
