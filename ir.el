@@ -350,13 +350,13 @@ Part of the ir-read function."
         (setq id
               (ir--return-column 'id ;; Uses the results of `'ir--query-by-column'
                                  ;; to return only the 'id value
-               (ir--query-by-column ;; Results in an item of the form ("id"
-                                    ;; afactor ... path)
+                                 (ir--query-by-column ;; Results in an item of the form ("id"
+                                  ;; afactor ... path)
 
-                ;; TODO Figure out a regex that works. Or save all paths as
-                ;; complete.
-                (s-replace "/home/adham/" "~/" (format "%s" (buffer-file-name)))
-                'path t)))))
+                                  ;; TODO Figure out a regex that works. Or save all paths as
+                                  ;; complete.
+                                  (s-replace "/home/adham/" "~/" (format "%s" (buffer-file-name)))
+                                  'path t)))))
   (find-file (org-id-find-id-file id))
   (widen) ;; In case of narrowing by previous functions.
   (goto-char (cdr (org-id-find id)))
@@ -379,11 +379,11 @@ Part of the ir-read function."
                     :where (= type $s1)]
                    type)))
     (progn
-        (emacsql ir-db
-                 [:select *
-                  :from ir
-                  :where (= type $s1)]
-                 type))))
+      (emacsql ir-db
+               [:select *
+                :from ir
+                :where (= type $s1)]
+               type))))
 
 (defun ir--list-unique-types ()
   "Return a list of every unique type."
@@ -391,11 +391,13 @@ Part of the ir-read function."
            [:select :distinct [type]
             :from ir]))
 
+(setq ir--list-of-unique-types (ir--list-unique-types))
+
 (defun ir--list-paths-of-type (list)
   "Return the nth element in a list of lists (LIST)."
   (let (result)
-  (dolist (item list result)
-    (push (nth 6 item) result))))
+    (dolist (item list result)
+      (push (nth 6 item) result))))
 
 (defun ir-open-pdf ()
   "Open a pdf from those in the `ir-db'."
