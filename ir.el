@@ -371,8 +371,38 @@ Part of the ir-read function."
 
                                         ; View & Open Functions
 ;; TODO Use (decode-time (seconds-to-time N))  to get human readable times.
-;;
-;; TODO View all <type> function.
+(defun ir-view-items-by-date ()
+  "View all items by their due date."
+  (interactive)
+  (let ((lists (emacsql ir-db [
+                               :select *
+                               :from ir
+                               :order-by date
+                               ])))
+    ;; (find-file "/home/adham/Dropbox/org/tmp/view-test.org")
+    (with-current-buffer (get-buffer-create "ir-view")
+      (erase-buffer)
+      (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists))
+    (switch-to-buffer "ir-view")
+    (org-mode)))
+
+(defun ir--view-create-table  (list-of-columns lists)
+  "Generate an org-table from sql query using a LIST-OF-COLUMNS and LISTS."
+  ;; Example use (create '("id" "date") '(("123" "23123") ("321" "23123123"))
+  ;; Use list of columns to generate the head
+  (insert "\n")
+  (org-table-create (format "%sx%s" (length list-of-columns) (length lists)))
+  (dolist (col-name list-of-columns)
+    (org-table-next-field)
+    (insert col-name))
+
+  (dolist (row lists)
+    (dolist (entry row)
+      (org-table-next-field)
+      (insert (format "%s" entry))))
+  (org-table-next-field)
+  (org-table-align))
+
 (defun ir--list-type (&optional type)
   "Retrun a list of items with a type. TYPE optional."
   (if (eq type nil)
