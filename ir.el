@@ -106,8 +106,8 @@
       (if (ir--check-duplicate-path path)
           (message "File %s is already in the database." path)
         (progn
-        (ir--create-heading)
-        (ir--insert-item (org-id-get) "pdf" path))
+          (ir--create-heading)
+          (ir--insert-item (org-id-get) "pdf" path))
         (find-file path))
     (message "File %s is not a pdf file." path)))
 
@@ -150,12 +150,12 @@ to avoid writing (nth 0) in all return functions that want a
 single item to return the value of a column from."
   (if return-item
       (progn
-        (nth 0(emacsql ir-db
-                       [:select *
-                        :from ir
-                        :where (= $s1 $i2)]
-                       value
-                       column)))
+        (nth 0 (emacsql ir-db
+                        [:select *
+                         :from ir
+                         :where (= $s1 $i2)]
+                        value
+                        column)))
     (progn
       (emacsql ir-db
                [:select *
