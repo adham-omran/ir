@@ -22,16 +22,26 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 * Tutorial
 @TODO
 
-* What's Next?
-- [ ] Implement extraction from org-mode files.
-- [ ] Implement a more user friendly way to create questions.
+* Development
+** Changelog
+- 0.3.0: Add basic view by due functions.
+- 0.2.0: Add basic persistent highlighting functions.
+- 0.1.0: Initial release with basic extraction functions.
+** What's Next?
 - [ ] Implement features to get results in a more easy to read form.
-- [ ] Implement functions to view the data.
 - [ ] Implement Zotero integration. The ability to add pdfs from a Zotero
   collection.
 - [ ] Implement ordering by priority.
-- [ ] Implement a way to import articles from the web.
+** Implementation of question creation
+I see a reason to implement a way to create basic or cloze questions. This is
+not SuperMemo and I've already worked out a way to create basic and cloze cards
+using [[https://www.github.com/adham-omran/ankifier][ankifier.el]]. Such that the form of my final workflow would be:
 
+#+begin_src org
+EXTRACT TEXT
+
+QUESTIONS
+#+end_src
 * Design of the Database
 Using ~emacsql~ I created the following table.
 
