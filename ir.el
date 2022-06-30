@@ -85,6 +85,16 @@
   (org-id-get-create)
   (org-narrow-to-subtree))
 
+;; (defun ir--create-subheading-at-point ()
+;;   "Create subheading with an org-id at the point."
+;;   ;; (org-open-file ir-extracts-location)
+;;   ;; (org-insert-subheading 3)
+;;   (org-insert-subheading nil)
+;;   ;; TODO Better heading name.
+;;   (insert (format "%s" (current-time)) "\n")
+;;   (org-id-get-create)
+;;   (org-narrow-to-subtree))
+
                                         ; Material Import Functions
                                         ; Importing a PDF
 (defun ir-add-pdf (path)
