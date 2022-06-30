@@ -26,6 +26,9 @@
 (require 'org-id)
 (require 's)
 
+;; Load
+(load! "ir-helper.el")
+
 ;; Variables
 
 (defgroup ir nil
