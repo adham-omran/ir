@@ -20,18 +20,16 @@
 ;;; Code:
 ;; (setq ir--table-list '("ir"))
 
-(defun ir-helper-select-all (table)
+(defun ir-helper-select-all ()
+  (interactive)
   "Select all rows from TABLE."
-  (interactive (list (completing-read "Choose: " "ir")))
   (message "%s" (emacsql ir-db [:select *
-                                :from $r1]
-                         table)))
+                                :from ir])))
 
-(defun ir-helper-drop-table (table)
+(defun ir-helper-drop-table ()
   "Drop TABLE."
-  (interactive (list (completing-read "Choose: " "ir")))
-  (emacsql ir-db [:drop :table $r1]
-           table))
+  (interactive)
+  (emacsql ir-db [:drop :table ir]))
 
 (defun ir-helper-find-item-from-id ()
   "Find the item in the db based on the org-id in context."
