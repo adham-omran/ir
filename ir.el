@@ -85,17 +85,7 @@
   (org-id-get-create)
   (org-narrow-to-subtree))
 
-;; (defun ir--create-subheading-at-point ()
-;;   "Create subheading with an org-id at the point."
-;;   ;; (org-open-file ir-extracts-location)
-;;   ;; (org-insert-subheading 3)
-;;   (org-insert-subheading nil)
-;;   ;; TODO Better heading name.
-;;   (insert (format "%s" (current-time)) "\n")
-;;   (org-id-get-create)
-;;   (org-narrow-to-subtree))
-
-                                        ; Material Import Functions
+                                        ; Import Functions
                                         ; Importing a PDF
 (defun ir-add-pdf (path)
   "Select and add a PATH pdf file to the databse."
@@ -333,18 +323,10 @@ Part of the ir-read function."
 ;;
 ;; TODO Rework navigation functions.
 ;;
-;; DONE Write an API to find stuff
-;;
-;; DONE Clearly define what an `item' and a `query' are.
-;;
 ;; I think what I want to have is a find by each column. And a function that
 ;; moves to the heading given an ID.
 ;;
-;; DONE Define what an ir-query function does.
-;;
-;; TODO Define all the ir-<subset> functions.
 
-;; DONE Find heading of open pdf. Use the full path to compare against db.
 (defun ir-navigate-to-heading (&optional id)
   "Navigate to the heading given ID."
   (interactive)
