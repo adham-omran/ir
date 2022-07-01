@@ -85,21 +85,26 @@
   (org-narrow-to-subtree))
 
                                         ; Import Functions
-                                        ; Importing a PDF
+                                        ; PDF
 (defun ir-add-pdf (path)
   "Select and add a PATH pdf file to the databse."
-  (interactive (list (read-file-name "Select PDF to add: ")))
+  (interactive (list (read-file-name "Select PDF to add: " nil nil t)))
   ;; First check if the file is a pdf. Second check if the file has already been
   ;; added.
+  ;; (setq path '("~/Dropbox/org/tmp/lorem-ipsum.pdf"))
+  ;; (setq path (expand-file-name path))
+
   (if (equal (file-name-extension path) "pdf")
       (if (ir--check-duplicate-path path)
           (message "File %s is already in the database." path)
         (progn
           (ir--create-heading)
-          (ir--insert-item (org-id-get) "pdf" path))
+          (ir--insert-item (org-id-get) "pdf" (expand-file-name path)))
         (find-file path))
     (message "File %s is not a pdf file." path)))
 
+                                        ; Web
+;; TODO Use localhost for zim articles.
 (defun ir-add-web-article ()
   "Add URL of a web article to the database."
   (interactive)
@@ -372,10 +377,7 @@ Part of the ir-read function."
                                  ;; to return only the 'id value
                                  (ir--query-by-column ;; Results in an item of the form ("id"
                                   ;; afactor ... path)
-
-                                  ;; TODO Figure out a regex that works. Or save all paths as
-                                  ;; complete.
-                                  (s-replace "/home/adham/" "~/" (format "%s" (buffer-file-name)))
+                                  (format "%s" (buffer-file-name))
                                   'path t)))))
   (find-file (org-id-find-id-file id))
   (widen) ;; In case of narrowing by previous functions.
