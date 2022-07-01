@@ -29,8 +29,6 @@
 ;; Load
 (load! "ir-helper.el")
 
-;; Variables
-
 (defgroup ir nil
   "Settings for `ir.el'."
   :link '(url-link "https://github.com/adham-omran/ir")
@@ -80,8 +78,6 @@
 (defun ir--create-subheading ()
   "Create subheading with an org-id."
   (org-open-file ir-extracts-file)
-  ;; (goto-char (point-max))
-  ;; (insert "\n") ; for safety
   (org-insert-subheading 1)
   ;; TODO Better heading name.
   (insert (format "%s" (current-time)) "\n")
@@ -386,6 +382,16 @@ Part of the ir-read function."
 
                                         ; Editing Functions
 ;; TODO Create (ir-change-priority id)
+;; (ir--update-value) is already complete to change the values
+;;
+;; The user interface will be a simple N step process
+
+;; 1. Choose search method
+;; 2. Enter search query
+;; 3. Choose the column you want to edit
+;; 4. Enter new value
+
+;; TODO Create (ir-update)
 
 
                                         ; View & Open Functions
