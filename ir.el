@@ -25,6 +25,7 @@
 (require 'org)
 (require 'org-id)
 (require 's)
+(require 'citar)
 
 ;; Load
 (load! "ir-helper.el")
