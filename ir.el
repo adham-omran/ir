@@ -150,7 +150,9 @@ Then add the file to the database."
     (when (equal item-type "pdf")
       (find-file item-path))
     (when (equal item-type "web")
-      (browse-url item-path))))
+      (browse-url item-path)
+      (ir-navigate-to-heading item-id)
+      (message "Open URL complete."))))
 
 (defun ir--query-closest-time ()
   "Query `ir-db' for the most due item.
