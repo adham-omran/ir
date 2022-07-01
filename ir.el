@@ -387,10 +387,42 @@ Part of the ir-read function."
                                         ; Editing Functions
 ;; TODO Create (ir-change-priority id)
 ;; (ir--update-value) is already complete to change the values
-;;
+
 ;; The user interface will be a simple N step process
 
-;; 1. Choose search method
+(defun ir-edit-update-column ()
+  "Search for an item."
+  ;; TODO Date
+  (interactive)
+
+  (let (
+        (lists (let (
+                     (column (completing-read "What column do you want to search: "
+                                              '("id" "afactor" "repetitions" "priority" "type" "path") nil t))
+                     (search-me (completing-read "What to search for: " nil)))
+                 ;; Body
+                 (emacsql ir-db [:select *
+                                 :from ir
+                                 :where $i1 :like $s2
+                                 ]
+                          (intern column) ;; Turns a string into a symbol
+                          (concat "%" search-me "%")))))
+    ;; Body
+    (with-current-buffer (get-buffer-create "ir-view")
+      (erase-buffer)
+      (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists))
+    (switch-to-buffer "ir-view")
+
+    ;; TODO Feedback
+
+    ;; TODO Integer vs String inputs columns.
+
+    ;; TODO Old value
+    (ir--update-value (completing-read "Which result: " lists)
+                      (completing-read "What column do you want to edit? " '("priority") nil t)
+                      (read-number "New value: "))))
+
+;; 1. Choose what column to search
 ;; 2. Enter search query
 ;; 3. Choose the column you want to edit
 ;; 4. Enter new value
