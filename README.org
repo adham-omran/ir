@@ -24,14 +24,12 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 
 * Development
 ** Changelog
+- 0.5.0: Add editing function (ir-edit-update-column).
 - 0.4.0: Add function (ir-add-bibtex-entry).
 - 0.3.0: Add basic view by due functions.
 - 0.2.0: Add basic persistent highlighting functions.
 - 0.1.0: Initial release with basic extraction functions.
 ** What's Next?
-- [ ] Implement features to get results in a more easy to read form.
-- [ ] Implement Zotero integration. The ability to add pdfs from a Zotero
-  collection.
 - [ ] Implement ordering by priority.
 ** Implementation of question creation
 I see a reason to implement a way to create basic or cloze questions. This is
