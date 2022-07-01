@@ -24,6 +24,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 
 * Development
 ** Changelog
+- 0.4.0: Add function (ir-add-bibtex-entry).
 - 0.3.0: Add basic view by due functions.
 - 0.2.0: Add basic persistent highlighting functions.
 - 0.1.0: Initial release with basic extraction functions.

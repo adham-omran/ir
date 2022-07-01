@@ -6,7 +6,7 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: June 22, 2022
-;; Version: 0.3.0
+;; Version: 0.4.0
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "24.3"))
@@ -117,7 +117,7 @@
 ;; This would greatly enhance the ability to add PDFs. It'd also seal the deal
 ;; for complete path as the file name.
 
-(defun ir-add-zotero (key-entry)
+(defun ir-add-bibtex-entry (key-entry)
   "Open library file associated with the KEY-ENTRY.
 
 With prefix, rebuild the cache before offering candidates.
