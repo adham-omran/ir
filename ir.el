@@ -116,6 +116,31 @@
 ;; This would greatly enhance the ability to add PDFs. It'd also seal the deal
 ;; for complete path as the file name.
 
+(defun ir-add-zotero (key-entry)
+  "Open library file associated with the KEY-ENTRY.
+
+With prefix, rebuild the cache before offering candidates.
+
+Then add the file to the database."
+  (interactive (list (citar-select-ref
+                      :rebuild-cache current-prefix-arg)))
+  (let ((embark-default-action-overrides '((file . citar-file-open))))
+    (when (and citar-library-paths
+               (stringp citar-library-paths))
+      (error "Make sure 'citar-library-paths' is a list of paths"))
+    (citar--library-file-action key-entry 'open))
+  ;; TODO What if the file does not have a path?
+  (let ((path (cdr (nth 2 key-entry))))
+    (if (ir--check-duplicate-path path)
+        (message "File %s is already in the database." path)
+      (progn
+        (ir--create-heading)
+        (ir--insert-item (org-id-get) "pdf" path))
+      (find-file path))))
+
+
+
+
 
                                         ; Database Functions
 (defun ir--open-item (list)
