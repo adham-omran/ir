@@ -43,6 +43,10 @@
   "Location of the extracts."
   :type '(string))
 
+(defcustom ir-highlights-file "~/org/ir-highlights.el"
+  "File to store highlights."
+  :type '(string))
+
 (defvar ir--list-of-unique-types '()
   "List of unique values. Used for selecting a view.")
 
@@ -509,10 +513,6 @@ Part of the ir-read function."
     (browse-url file)))
 
                                         ; Highlighting Functions
-
-(defcustom ir-highlights-file "/home/adham/Dropbox/code/projects/ir/ir-highlights.el"
-  "File to store highlights."
-  :type '(string))
 
 (defvar ir--highlights-saved (make-hash-table :test 'equal))
 
