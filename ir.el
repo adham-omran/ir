@@ -61,7 +61,7 @@
                 ([(id text :primary-key)
                   (afactor real :default 1.5)
                   (interval integer :default 1)
-                  (priority integer :default 50)
+                  (priority real :default 50.0)
                   (date integer)
                   (type text :not-null)
                   (path text)
