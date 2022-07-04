@@ -352,12 +352,11 @@ Part of the ir-read function."
 
 
                                         ; Navigation Functions
-;; TODO Find pdf. Query in db for path. To do this, I can check if the path of
-;; the ID is non-nil, if it's non-nil, then I can navigate to that path with a
-;; simple open operation.
 (defun ir-navigate-to-source ()
-  ;; (interactive)
-  "Navigate to the source of a heading if one exists.")
+  "Navigate to the source of a heading if one exists."
+  (interactive)
+  ;; get the id, use that to get the type, use the path.
+  (ir--open-item (ir--query-by-column (org-id-get) 'id t)))
 
 
 ;;
