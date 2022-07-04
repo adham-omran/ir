@@ -117,11 +117,6 @@
     (ir--create-heading)
     (ir--insert-item (org-id-get) "web" url)))
 
-;; TODO Import from Zotero
-;;
-;; This would greatly enhance the ability to add PDFs. It'd also seal the deal
-;; for complete path as the file name.
-
 (defun ir-add-bibtex-entry (key-entry)
   "Open library file associated with the KEY-ENTRY.
 
@@ -142,7 +137,6 @@ Then add the file to the database."
     (unless (equal (car (nth 1 key-entry)) "has-file")
       (throw 'no-file (message "No file")))
 
-    ;; TODO What if the file does not have a path?
     (let ((path (cdr (nth 2 key-entry))))
       (if (ir--check-duplicate-path path)
           (message "File %s is already in the database." path)
