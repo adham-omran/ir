@@ -28,7 +28,7 @@
 (require 'citar)
 
 ;; Load
-(load! "ir-helper.el")
+(load "~/Dropbox/code/projects/ir/ir-helper.el")
 
 (defgroup ir nil
   "Settings for `ir.el'."
