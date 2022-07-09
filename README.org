@@ -48,8 +48,8 @@ Using ~emacsql~ I created the following table.
 |----------+----------+------------------------------|
 | id       | TEXT     | Unique ID using ~org-id~       |
 | afactor  | REAL     | [[https://super-memory.com/help/g.htm#A-Factor][A-Factor]]                     |
+| priority | REAL     | [[https://super-memory.com/help/g.htm#Priority][Priority]]                     |
 | interval | INTEGER  | [[https://super-memory.com/help/g.htm#Interval][Interval]]                     |
-| priority | INTEGER  | [[https://super-memory.com/help/g.htm#Priority][Priority]]                     |
 | date     | INTEGER  | Date of next repetition      |
 | type     | TEXT     | Type of file (org-mode, pdf) |
 | path     | TEXT     | Path to file if applicalble  |
