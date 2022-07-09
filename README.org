@@ -31,6 +31,12 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 - 0.1.0: Initial release with basic extraction functions.
 ** What's Next?
 - [ ] Implement ordering by priority.
+- [ ] Video playback (vlc vs mpv).
+  - [ ] From YouTube.
+  - [ ] From local files.
+- [ ] Change the affinity for priority from INTEGER to REAL.
+- [ ] org-roam integration.
+- [ ] Create a heading of a pdf even if the pdf is not in the db.
 ** Implementation of question creation
 I see a reason to implement a way to create basic or cloze questions. This is
 not SuperMemo and I've already worked out a way to create basic and cloze cards
