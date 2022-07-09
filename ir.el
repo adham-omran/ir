@@ -6,7 +6,7 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: June 22, 2022
-;; Version: 0.5.0
+;; Version: 0.5.1
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "24.3"))
@@ -117,27 +117,15 @@
     (ir--create-heading)
     (ir--insert-item (org-id-get) "web" url)))
 
-(defun ir-add-bibtex-entry (key-entry)
-  "Open library file associated with the KEY-ENTRY.
-
-With prefix, rebuild the cache before offering candidates.
-
-Then add the file to the database."
-  (interactive (list (citar-select-ref
-                      :rebuild-cache current-prefix-arg)))
-  ;; The (let) statement seems to be useless here
-  ;;
-  ;; (let ((embark-default-action-overrides '((file . citar-file-open))))
-  ;;   (when (and citar-library-paths
-  ;;              (stringp citar-library-paths))
-  ;;     (error "Make sure 'citar-library-paths' is a list of paths"))
-  ;;   (citar--library-file-action key-entry 'open))
+(defun ir-add-bibtex-entry (entry-path-string)
+  "Select an entry from bibliography, if there's a file, insert into db."
+  (interactive (citar-get-files (citar-select-ref)))
 
   (catch 'no-file
-    (unless (equal (car (nth 1 key-entry)) "has-file")
-      (throw 'no-file (message "No file")))
+    (if (equal entry-path-string nil)
+	(throw 'no-file (message "No file")))
 
-    (let ((path (cdr (nth 2 key-entry))))
+    (let ((path entry-path-string))
       (if (ir--check-duplicate-path path)
           (message "File %s is already in the database." path)
         (progn
