@@ -6,7 +6,7 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: June 22, 2022
-;; Version: 0.5.1
+;; Version: 0.5.2
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "24.3"))
@@ -346,16 +346,6 @@ Part of the ir-read function."
   ;; get the id, use that to get the type, use the path.
   (ir--open-item (ir--query-by-column (org-id-get) 'id t)))
 
-
-;;
-;; This exposed the problem of storing paths with ~ vs /home/USER/
-;;
-;; TODO Rework navigation functions.
-;;
-;; I think what I want to have is a find by each column. And a function that
-;; moves to the heading given an ID.
-;;
-
 (defun ir-navigate-to-heading (&optional id)
   "Navigate to the heading given ID."
   (interactive)
@@ -396,11 +386,10 @@ Part of the ir-read function."
                                  ]
                           (intern column) ;; Turns a string into a symbol
                           (concat "%" search-me "%")))))
-    ;; Body
-    (with-current-buffer (get-buffer-create "ir-view")
-      (erase-buffer)
-      (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists))
-    (switch-to-buffer "ir-view")
+    ;; Find file approach
+    (find-file (make-temp-file "ir-view" nil ".org"))
+    (erase-buffer)
+    (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists)
 
     ;; TODO Feedback
 
@@ -416,11 +405,11 @@ Part of the ir-read function."
 ;; 3. Choose the column you want to edit
 ;; 4. Enter new value
 
-;; TODO Create (ir-update)
-
-
                                         ; View & Open Functions
-;; TODO Use (decode-time (seconds-to-time N))  to get human readable times.
+(defun ir--format-time (N)
+  "Used in a table to convert the N dates into human-readable times."
+  (format-time-string "%F, %R:%S" N))
+
 (defun ir-view-items-by-date ()
   "View all items by their due date."
   (interactive)
@@ -429,12 +418,11 @@ Part of the ir-read function."
                                :from ir
                                :order-by date
                                ])))
-    ;; (find-file "/home/adham/Dropbox/org/tmp/view-test.org")
-    (with-current-buffer (get-buffer-create "ir-view")
-      (erase-buffer)
-      (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists))
-    (switch-to-buffer "ir-view")
-    (org-mode)))
+    ;; Create a file
+    (find-file (make-temp-file "ir-view" nil ".org"))
+    (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists)
+    (goto-char (point-max))
+    (insert "#+tblfm: @<<$5..@>>$5='(ir--format-time (string-to-number $5))")))
 
 (defun ir--view-create-table  (list-of-columns lists)
   "Generate an org-table from sql query using a LIST-OF-COLUMNS and LISTS."
