@@ -367,6 +367,9 @@ Part of the ir-read function."
 ;; TODO Create (ir-change-priority id)
 ;; (ir--update-value) is already complete to change the values
 
+;; (defun ir-edit-change-priority ()
+;;   (interactive))
+
 ;; The user interface will be a simple N step process
 
 (defun ir-edit-update-column ()
