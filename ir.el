@@ -47,11 +47,16 @@
   "File to store highlights."
   :type '(string))
 
+(defcustom ir-return-to-pdf t
+  "If t return to the PDF after extracting."
+  :type '(boolean))
+
 (defvar ir--list-of-unique-types '()
   "List of unique values. Used for selecting a view.")
 
 (defvar ir--p-column-names '(id 0 afactor 1 interval 2 priority 3 date 4
                                 type 5 path 6))
+
 
 ;; Database creation
 (defvar ir-db (emacsql-sqlite ir-db-location))
