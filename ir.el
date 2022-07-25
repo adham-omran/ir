@@ -122,21 +122,20 @@
     (ir--create-heading)
     (ir--insert-item (org-id-get) "web" url)))
 
-(defun ir-add-bibtex-entry (entry-path-string)
+(defun ir-add-bibtex-entry ()
   "Select an entry from bibliography, if there's a file, insert into db."
-  (interactive (citar-get-files (citar-select-ref)))
+  (interactive)
 
-  (catch 'no-file
-    (if (equal entry-path-string nil)
-	(throw 'no-file (message "No file")))
+  (let ((ref (citar-select-ref)))
+    ;; (message "%s" (assoc "file" ref))
 
-    (let ((path entry-path-string))
-      (if (ir--check-duplicate-path path)
-          (message "File %s is already in the database." path)
-        (progn
-          (ir--create-heading)
-          (ir--insert-item (org-id-get) "pdf" path))
-        (find-file path)))))
+    (cond ((equal (assoc "has-file" ref) nil) (message "No file."))
+          ((ir--check-duplicate-path (cdr (assoc "file" ref))) (message "File already exists."))
+          (t
+           (progn
+             (ir--create-heading)
+             (ir--insert-item (org-id-get) "pdf" (cdr (assoc "file" ref)))
+             (find-file (cdr (assoc "file" ref))))))))
 
                                         ; Database Functions
 (defun ir--open-item (list)
