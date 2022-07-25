@@ -9,7 +9,7 @@
 ;; Version: 0.5.2
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
-;; Package-Requires: ((emacs "24.3"))
+;; Package-Requires: ((emacs "24.4"))
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
@@ -109,7 +109,7 @@
     (message "File %s is not a pdf file." path)))
 
                                         ; Web
-;; TODO Use localhost for zim articles.
+
 (defun ir-add-web-article ()
   "Add URL of a web article to the database."
   (interactive)
