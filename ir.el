@@ -266,16 +266,14 @@ Part of the ir-read function."
 ;; TODO Create `ir--extracts-file-p' as a predicate function to check if we're
 ;; in the extracts location.
 
-;; TODO Why /not/ make this a general function?
-;; Check if pdf and perform `ir--extract-pdf-tools'?
-
 ;; If the file is not a pdf. Clip the selection into the kill ring. Move into
 ;; an org-id heading. Create a subheading and paste.
 (defun ir-extract-region ()
   "Extract from the current active region into appropriate org-id heading."
   (interactive)
   (when (equal (file-name-extension (buffer-file-name)) "pdf")
-    (ir--extract-pdf-tools))
+    (ir--extract-pdf-tools)
+    (when ir-return-to-pdf (previous-buffer)))
   (catch 'no-region
     (unless (use-region-p)
       (throw 'no-region
