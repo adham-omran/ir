@@ -320,26 +320,41 @@ Part of the ir-read function."
   ;; Add extract to the database
   (ir--insert-item (org-id-get) "text"))
 
-                                        ; Read Functions
-;; (Minor mode) ideas
-;;; A session starts a new emcas frame (alike org-noter).
+(defun ir--pdf-view-copy ()
+  "Copy the region to the `kill-ring'."
+  (pdf-view-assert-active-region)
+  (let* ((txt (pdf-view-active-region-text)))
+    (kill-new (mapconcat 'identity txt "\n"))))
 
-(defun ir-read-start ()
-  "Start the reading session."
-  (interactive)
-  ;; TODO How to handle not finding an item.
-  (ir--open-item (ir--query-closest-time)))
+                                        ; Read Functions
 
 (defun ir-read-next ()
-  "Move to the next item in the queue."
+  "Move to the next item in the queue, compute next interval."
+  (interactive)
+  ;; TODO How to handle not finding an item.
+  (ir--compute-new-interval)
+  (ir--open-item (ir--query-closest-time)))
+
+(defun ir-start-session ()
+  "Start a session."
+  (interactive)
+  (make-frame '((name . "ir-session")))
+  (select-frame-set-input-focus (next-frame))
+  (toggle-frame-fullscreen)
+  (ir--open-item (ir--query-closest-time))
+  ;; If the material is a pdf, split.
+  (when (equal (file-name-extension (buffer-file-name)) "pdf")
+    (split-window-right)
+    (ir-navigate-to-heading)
+    (other-window 1)
+    (pdf-view-fit-page-to-window)
+    (other-window 1)))
+
+(defun ir-end-session ()
+  "End a session."
   (interactive)
   (ir--compute-new-interval)
-  (ir-read-start))
-
-(defun ir-read-finish ()
-  "Finish the reading sesssion."
-  (interactive)
-  (ir--compute-new-interval))
+  (delete-frame))
 
 
 
