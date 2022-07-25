@@ -6,7 +6,7 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: June 22, 2022
-;; Version: 0.5.2
+;; Version: 0.6.0
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "24.4"))
@@ -300,12 +300,6 @@ Part of the ir-read function."
   (equal (buffer-file-name) ir-extracts-file))
 
                                         ; From pdf-tools
-
-(defun ir--pdf-view-copy ()
-  "Copy the region to the `kill-ring'."
-  (pdf-view-assert-active-region)
-  (let* ((txt (pdf-view-active-region-text)))
-    (kill-new (mapconcat 'identity txt "\n"))))
 
 (defun ir--extract-pdf-tools ()
   "Create an extract from selection."
