@@ -549,7 +549,7 @@ Part of the ir-read function."
 
                                         ; Collection Functions
                                         ;; web - firefox
-;; These funcitons collect text from the web. They are most useful when configured with a DE/WM.
+;; These functions collect text from the web. They are most useful when configured with a DE/WM.
 ;;
 ;; TODO org-protocol?
 
