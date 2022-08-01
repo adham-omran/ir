@@ -212,21 +212,16 @@ Prime use case it to get the id of a particular query. Note this
 only access the first result."
   (nth (plist-get ir--p-column-names column) query))
 
-(defun ir--check-duplicate-path (path)
-  "Check `ir-db' for matching PATH."
+(defun ir--check-duplicate (column value)
+  "Check in COLUMN for VALUE."
   (emacsql ir-db
            [:select *
             :from ir
-            :where (= path $s1)]
-           path))
+            :where (= $i1 $s2)]
+           column
+           value))
 
-(defun ir--check-duplicate-id (id)
-  "Check `ir-db' for matching ID."
-  (emacsql ir-db
-           [:select *
-            :from ir
-            :where (= id $s1)]
-           id))
+(ir--check-duplicate 'id "b8b2e884-4d3c-412f-adf1-c71934984d93")
 
 (defun ir--insert-item (id type &optional path)
   "Insert item into `ir' database with TYPE and ID."
