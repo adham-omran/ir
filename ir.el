@@ -431,7 +431,7 @@ Part of the ir-read function."
 
     ;; TODO Old value
     (ir--update-value (completing-read "Which result: " lists)
-                      (completing-read "What column do you want to edit? " '("priority") nil t)
+                      (completing-read "What column do you want to edit? " '("priority" "date") nil t)
                       (read-number "New value: "))))
 
 ;; 1. Choose what column to search
