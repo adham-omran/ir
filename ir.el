@@ -211,6 +211,14 @@ only access the first result."
             :where (= path $s1)]
            path))
 
+(defun ir--check-duplicate-id (id)
+  "Check `ir-db' for matching ID."
+  (emacsql ir-db
+           [:select *
+            :from ir
+            :where (= id $s1)]
+           id))
+
 (defun ir--insert-item (id type &optional path)
   "Insert item into `ir' database with TYPE and ID."
   (unless path (setq path nil)) ;; Check if a path has been supplied.
