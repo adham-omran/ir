@@ -26,6 +26,7 @@
 (require 'org-id)
 (require 's)
 (require 'citar)
+(require 'org-roam)
 
 ;; Load
 (load "~/Dropbox/code/projects/ir/ir-helper.el")
