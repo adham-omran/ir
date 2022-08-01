@@ -146,6 +146,15 @@
   (interactive)
   (ir--insert-item (org-id-get) "text"))
 
+(cl-defun ir-add-roam-node-by-find (&optional initial-input filter-fn pred)
+  "Find and open an Org-roam node by its title or alias. Then add it.
+
+No clue what INITIAL-INPUT, FILTER-FN or PRED do."
+  (interactive current-prefix-arg)
+  (let ((node (org-roam-node-read initial-input filter-fn pred)))
+    (cond ((ir--check-duplicate-id (org-roam-node-id node)) (message "Node already exists."))
+          (t (ir--insert-item (org-roam-node-id node) "txt")))))
+
                                         ; Database Functions
 (defun ir--open-item (list)
   "Opens an item given a LIST. Usually from a query."
