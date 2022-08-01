@@ -122,6 +122,8 @@
     (ir--create-heading)
     (ir--insert-item (org-id-get) "web" url)))
 
+                                        ; Bibtex
+
 (defun ir-add-bibtex-entry ()
   "Select an entry from bibliography, if there's a file, insert into db."
   (interactive)
@@ -136,6 +138,12 @@
              (ir--create-heading)
              (ir--insert-item (org-id-get) "pdf" (cdr (assoc "file" ref)))
              (find-file (cdr (assoc "file" ref))))))))
+
+                                        ; org-roam
+(defun ir-add-current-roam-node ()
+  "Add the currently visited roam node."
+  (interactive)
+  (ir--insert-item (org-id-get) "text"))
 
                                         ; Database Functions
 (defun ir--open-item (list)
