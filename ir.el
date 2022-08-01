@@ -106,13 +106,14 @@
   ;; (setq path (expand-file-name path))
 
   (if (equal (file-name-extension path) "pdf")
-      (if (ir--check-duplicate-path path)
-          (message "File %s is already in the database." path)
+      (if (ir--check-duplicate 'path (expand-file-name path))
+          (message "%s.pdf is already in the database." (file-name-base path))
         (progn
           (ir--create-heading)
-          (ir--insert-item (org-id-get) "pdf" (expand-file-name path)))
+          (ir--insert-item (org-id-get) "pdf" path))
         (find-file path))
     (message "File %s is not a pdf file." path)))
+(ir--check-duplicate 'path "/home/adham/Dropbox/org/tmp/lorem-ipsum.pdf")
 
                                         ; Web
 
@@ -128,12 +129,12 @@
 (defun ir-add-bibtex-entry ()
   "Select an entry from bibliography, if there's a file, insert into db."
   (interactive)
-
   (let ((ref (citar-select-ref)))
     ;; (message "%s" (assoc "file" ref))
 
     (cond ((equal (assoc "has-file" ref) nil) (message "No file."))
-          ((ir--check-duplicate-path (cdr (assoc "file" ref))) (message "File already exists."))
+          ((ir--check-duplicate 'path (cdr (assoc "file" ref)))
+           (message "%s.pdf already exists." (file-name-base (cdr (assoc "file" ref)))))
           (t
            (progn
              (ir--create-heading)
@@ -152,7 +153,7 @@
 No clue what INITIAL-INPUT, FILTER-FN or PRED do."
   (interactive current-prefix-arg)
   (let ((node (org-roam-node-read initial-input filter-fn pred)))
-    (cond ((ir--check-duplicate-id (org-roam-node-id node)) (message "Node already exists."))
+    (cond ((ir--check-duplicate 'id (org-roam-node-id node)) (message "Node already exists."))
           (t (ir--insert-item (org-roam-node-id node) "txt")))))
 
                                         ; Database Functions
