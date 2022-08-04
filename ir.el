@@ -95,6 +95,15 @@
   (org-id-get-create)
   (org-narrow-to-subtree))
 
+(defun ir--check-duplicate (column value)
+  "Check in COLUMN for VALUE."
+  (emacsql ir-db
+           [:select *
+            :from ir
+            :where (= $i1 $s2)]
+           column
+           value))
+
                                         ; Import Functions
                                         ; PDF
 (defun ir-add-pdf (path)
@@ -213,16 +222,7 @@ Prime use case it to get the id of a particular query. Note this
 only access the first result."
   (nth (plist-get ir--p-column-names column) query))
 
-(defun ir--check-duplicate (column value)
-  "Check in COLUMN for VALUE."
-  (emacsql ir-db
-           [:select *
-            :from ir
-            :where (= $i1 $s2)]
-           column
-           value))
-
-(ir--check-duplicate 'id "b8b2e884-4d3c-412f-adf1-c71934984d93")
+;; (ir--check-duplicate 'id "b8b2e884-4d3c-412f-adf1-c71934984d93")
 
 (defun ir--insert-item (id type &optional path)
   "Insert item into `ir' database with TYPE and ID."
