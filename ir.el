@@ -423,7 +423,7 @@ Part of the ir-read function."
     ;; Find file approach
     (find-file (make-temp-file "ir-view" nil ".org"))
     (erase-buffer)
-    (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists)
+    (ir--view-create-table lists)
 
     ;; TODO Feedback
 
@@ -454,26 +454,29 @@ Part of the ir-read function."
                                ])))
     ;; Create a file
     (find-file (make-temp-file "ir-view" nil ".org"))
-    (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists)
+    (ir--view-create-table lists)
     (goto-char (point-max))
-    (insert "#+tblfm: @<<$5..@>>$5='(ir--format-time (string-to-number $5))")))
+    (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")))
 
-(defun ir--view-create-table  (list-of-columns lists)
-  "Generate an org-table from sql query using a LIST-OF-COLUMNS and LISTS."
-  ;; Example use (create '("id" "date") '(("123" "23123") ("321" "23123123"))
-  ;; Use list of columns to generate the head
+(defun ir--view-create-table (lists)
+  "Transform a list of LISTS into a table."
   (insert "\n")
-  (org-table-create (format "%sx%s" (length list-of-columns) (length lists)))
-  (dolist (col-name list-of-columns)
-    (org-table-next-field)
-    (insert col-name))
-
-  (dolist (row lists)
-    (dolist (entry row)
-      (org-table-next-field)
-      (insert (format "%s" entry))))
-  (org-table-next-field)
-  (org-table-align))
+  (insert (format "%s" lists))
+  (goto-char (point-min))
+  (while (re-search-forward ") (" nil t)
+    (replace-match "\n|"))
+  (goto-char (point-min))
+  (while (re-search-forward " \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([a-z]*\\) " nil t)
+    (replace-match "|\\1|\\2|\\3|\\4|\\5|"))
+  (goto-char (point-max))
+  (backward-delete-char 2)
+  (goto-char (point-min))
+  (insert "|ID|AF|REP|PR|DATE|TYPE|PATH\n")
+  (delete-char 3)
+  (insert "|")
+  (org-table-align)
+  (goto-char (point-min))
+  (org-table-insert-hline))
 
 (defun ir--list-type (&optional type)
   "Retrun a list of items with a type. TYPE optional."
