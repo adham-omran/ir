@@ -440,10 +440,6 @@ Part of the ir-read function."
 ;; 4. Enter new value
 
                                         ; View & Open Functions
-(defun ir--format-time (N)
-  "Used in a table to convert the N dates into human-readable times."
-  (format-time-string "%F, %R:%S" N))
-
 (defun ir-view-items-by-date ()
   "View all items by their due date."
   (interactive)
@@ -457,6 +453,10 @@ Part of the ir-read function."
     (ir--view-create-table lists)
     (goto-char (point-max))
     (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")))
+
+(defun ir--format-time (N)
+  "Used in a table to convert the N dates into human-readable times."
+  (format-time-string "%F, %R:%S" N))
 
 (defun ir--view-create-table (lists)
   "Transform a list of LISTS into a table."
