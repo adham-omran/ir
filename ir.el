@@ -395,19 +395,10 @@ Part of the ir-read function."
   (org-narrow-to-subtree))
 
                                         ; Editing Functions
-;; TODO Create (ir-change-priority id)
-;; (ir--update-value) is already complete to change the values
-
-;; (defun ir-edit-change-priority ()
-;;   (interactive))
-
-;; The user interface will be a simple N step process
-
-(defun ir-edit-update-column ()
+(defun ir-edit-column ()
   "Search for an item."
   ;; TODO Date
   (interactive)
-
   (let (
         (lists (let (
                      (column (completing-read "What column do you want to search: "
@@ -424,15 +415,13 @@ Part of the ir-read function."
     (find-file (make-temp-file "ir-view" nil ".org"))
     (erase-buffer)
     (ir--view-create-table lists)
-
-    ;; TODO Feedback
-
-    ;; TODO Integer vs String inputs columns.
-
-    ;; TODO Old value
-    (ir--update-value (completing-read "Which result: " lists)
-                      (completing-read "What column do you want to edit? " '("priority" "date") nil t)
-                      (read-number "New value: "))))
+    ;; Update the value
+    (let ((result (completing-read "Which result: " lists))
+          (column-name (completing-read "What column do you want to edit? " '("id" "afactor" "repetitions" "priority" "type" "path") nil t)))
+      (ir--update-value result
+                        column-name
+      (cond ((member column-name '("id" "afactor" "repetitions" "priority")) (read-number "New value: "))
+            (t (read-string "New value: ")))))))
 
 ;; 1. Choose what column to search
 ;; 2. Enter search query
