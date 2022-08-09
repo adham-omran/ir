@@ -97,9 +97,9 @@
                                         ; Import Functions
                                         ; PDF
 (defun ir-add-pdf (path)
-  "Select and add a PATH pdf file to the databse."
+  "Select and add a PATH PDF file to the database."
   (interactive (list (read-file-name "Select PDF to add: " nil nil t)))
-  ;; First check if the file is a pdf. Second check if the file has already been
+  ;; First check if the file is a PDF. Second check if the file has already been
   ;; added.
   ;; (setq path '("~/Dropbox/org/tmp/lorem-ipsum.pdf"))
   ;; (setq path (expand-file-name path))
@@ -111,7 +111,7 @@
           (ir--create-heading)
           (ir--insert-item (org-id-get) "pdf" (expand-file-name path)))
         (find-file path))
-    (message "File %s is not a pdf file." path)))
+    (message "File %s is not a PDF file." path)))
 
                                         ; Web
 
@@ -227,9 +227,9 @@ only access the first result."
 (defun ir--compute-new-interval ()
   "Compute a new interval for the item of ID.
 Part of the ir-read function."
-  ;; The way I have it compute new interval for a pdf file is as follows.
+  ;; The way I have it compute new interval for a PDF file is as follows.
   ;;
-  ;; Navigate to the header of the pdf file. Use its ID to update the pdf's
+  ;; Navigate to the header of the PDF file. Use its ID to update the PDF's
   ;; interval. This makes sense because the PDF is just another ID in the db.
   (if (equal (file-name-extension (buffer-file-name)) "pdf")
       (ir-navigate-to-heading))
@@ -266,7 +266,7 @@ Part of the ir-read function."
 ;; TODO Create `ir--extracts-file-p' as a predicate function to check if we're
 ;; in the extracts location.
 
-;; If the file is not a pdf. Clip the selection into the kill ring. Move into
+;; If the file is not a PDF. Clip the selection into the kill ring. Move into
 ;; an org-id heading. Create a subheading and paste.
 (defun ir-extract-region ()
   "Extract from the current active region into appropriate org-id heading."
@@ -305,7 +305,7 @@ Part of the ir-read function."
   "Create an extract from selection."
   (ir--pdf-view-copy)
   (pdf-annot-add-highlight-markup-annotation (pdf-view-active-region) "sky blue")
-  ;; Move to the pdf file's heading
+  ;; Move to the PDF file's heading
   (ir-navigate-to-heading)
   (ir--create-subheading)
   (yank)
@@ -334,7 +334,7 @@ Part of the ir-read function."
   (select-frame-set-input-focus (next-frame))
   (toggle-frame-fullscreen)
   (ir--open-item (ir--query-closest-time))
-  ;; If the material is a pdf, split.
+  ;; If the material is a PDF, split.
   (when (equal (file-name-extension (buffer-file-name)) "pdf")
     (split-window-right)
     (ir-navigate-to-heading)
@@ -456,7 +456,7 @@ Part of the ir-read function."
   (org-table-align))
 
 (defun ir--list-type (&optional type)
-  "Retrun a list of items with a type. TYPE optional."
+  "Return a list of items with a type. TYPE optional."
   (if (eq type nil)
       (progn
         (let ((type (completing-read "Choose type: " ir--list-of-unique-types)))
@@ -487,9 +487,9 @@ Part of the ir-read function."
       (push (nth 6 item) result))))
 
 (defun ir-open-pdf ()
-  "Open a pdf from those in the `ir-db'."
+  "Open a PDF from those in the `ir-db'."
   (interactive)
-  (let ((file (completing-read "Choose pdf: " (ir--list-paths-of-type (ir--list-type "pdf")))))
+  (let ((file (completing-read "Choose PDF: " (ir--list-paths-of-type (ir--list-type "pdf")))))
     (find-file file)))
 
 (defun ir-open-web ()
@@ -503,7 +503,7 @@ Part of the ir-read function."
 (defvar ir--highlights-saved (make-hash-table :test 'equal))
 
 (defun ir--highlights-export ()
-  "Exports highlist alist to file."
+  "Exports highlights alist to file."
   (with-temp-file ir-highlights-file
     (delete-file ir-highlights-file)
     (insert (format "(setq %s '%S)\n" 'ir--highlights-saved (symbol-value 'ir--highlights-saved))))
@@ -524,11 +524,11 @@ Part of the ir-read function."
     (highlight-phrase i 'hi-blue)))
 
 ;; How to handle loading and exporting?
-;;; Simply load highlights for every function that vists a heading. And export
+;;; Simply load highlights for every function that visits a heading. And export
 ;;; after every function that highlights.
 
                                         ; Collection Functions
-;; These funcitons collect text from the web. They are most useful when configured with a DE/WM.
+;; These functions collect text from the web. They are most useful when configured with a DE/WM.
 
 ;; TODO ir-collect-from-web-selection
 
