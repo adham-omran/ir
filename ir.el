@@ -344,15 +344,20 @@ Part of the ir-read function."
   "Move to the next item in the queue, compute next interval."
   (interactive)
   ;; TODO How to handle not finding an item.
-  (ir--compute-new-interval)
-  (ir--open-item (ir--query-closest-time)))
+  ;;
+  ;; TODO Update to handle the session style. Perhaps I could check by input and
+  ;; split the window if the type is pdf.
+  (ir--reading-setup (ir--query-closest-time))
+  ;; (ir--open-item (ir--query-closest-time))
+  ;; (ir--compute-new-interval)
+  )
 
 (defun ir-start-session ()
   "Start a session."
   (interactive)
   (make-frame '((name . "ir-session")))
-  (select-frame-set-input-focus (next-frame))
-  (toggle-frame-fullscreen)
+  ;; (select-frame-set-input-focus (next-frame))
+  ;; (toggle-frame-fullscreen)
   (ir--open-item (ir--query-closest-time))
   ;; If the material is a pdf, split.
   (when (equal (file-name-extension (buffer-file-name)) "pdf")
@@ -367,6 +372,21 @@ Part of the ir-read function."
   (interactive)
   (ir--compute-new-interval)
   (delete-frame))
+
+(defun ir--reading-setup (list)
+  "Prepare the ideal environmet given a LIST."
+  (let ((item-id (nth 0 list))
+        (item-type (nth 5 list))
+        (item-path (nth 6 list)))
+    (message "%s" item-path)
+    ;; Body
+    (when (equal item-type "pdf")
+      (delete-other-windows)
+      (find-file item-path)
+      (split-window-horizontally)
+      (ir-navigate-to-heading))
+    (when (equal item-type "text")
+      (org-id-open item-id))))
 
 
 
