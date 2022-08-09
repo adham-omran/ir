@@ -402,7 +402,7 @@ Part of the ir-read function."
   (let (
         (lists (let (
                      (column (completing-read "What column do you want to search: "
-                                              '("id" "afactor" "repetitions" "priority" "type" "path") nil t))
+                                              '("id" "afactor" "interval" "priority" "type" "path") nil t))
                      (search-me (completing-read "What to search for: " nil)))
                  ;; Body
                  (emacsql ir-db [:select *
@@ -417,10 +417,10 @@ Part of the ir-read function."
     (ir--view-create-table lists)
     ;; Update the value
     (let ((result (completing-read "Which result: " lists))
-          (column-name (completing-read "What column do you want to edit? " '("id" "afactor" "repetitions" "priority" "type" "path") nil t)))
+          (column-name (completing-read "What column do you want to edit? " '("id" "afactor" "interval" "date" "priority" "type" "path") nil t)))
       (ir--update-value result
                         column-name
-      (cond ((member column-name '("id" "afactor" "repetitions" "priority")) (read-number "New value: "))
+      (cond ((member column-name '("id" "afactor" "interval" "priority" "date")) (read-number "New value: "))
             (t (read-string "New value: ")))))))
 
 ;; 1. Choose what column to search
@@ -460,7 +460,7 @@ Part of the ir-read function."
   (goto-char (point-max))
   (backward-delete-char 2)
   (goto-char (point-min))
-  (insert "|ID|AF|REP|PR|DATE|TYPE|PATH\n")
+  (insert "|ID|AF|Inerval|PR|DATE|TYPE|PATH\n")
   (delete-char 3)
   (insert "|")
   (org-table-align)
