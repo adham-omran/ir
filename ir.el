@@ -263,9 +263,6 @@ Part of the ir-read function."
 ;;
 ;; 2. The user is using org-roam.
 ;;
-;; TODO Create `ir--extracts-file-p' as a predicate function to check if we're
-;; in the extracts location.
-
 ;; If the file is not a PDF. Clip the selection into the kill ring. Move into
 ;; an org-id heading. Create a subheading and paste.
 (defun ir-extract-region ()
@@ -528,6 +525,7 @@ Part of the ir-read function."
 ;;; after every function that highlights.
 
                                         ; Collection Functions
+                                        ;; web - firefox
 ;; These functions collect text from the web. They are most useful when configured with a DE/WM.
 
 ;; TODO ir-collect-from-web-selection
