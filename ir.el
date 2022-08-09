@@ -65,7 +65,7 @@
 
 (emacsql ir-db [:create-table :if-not-exists ir
                 ([(id text :primary-key)
-                  (afactor real :default 1.5)
+                  (afactor real :default 1.2)
                   (interval integer :default 1)
                   (priority real :default 50.0)
                   (date integer)
@@ -261,8 +261,8 @@ Part of the ir-read function."
           (old-a (ir--return-column 'afactor item))
           (old-interval (ir--return-column 'interval item))
           (old-date (ir--return-column 'date item)))
-      (ir--update-value (org-id-get) "interval" (round (* old-interval (+ old-a 0.08))))
-      (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
+      (ir--update-value (org-id-get) "interval" (round (* old-interval old-a)))
+      (ir--update-value (org-id-get) "afactor" (+ old-a 0.015))
       (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
 
                                         ; Extract Functions
