@@ -24,6 +24,11 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 
 * Development
 ** Changelog
+- 0.7.0:
+  - Refactor (ir-start-session).
+  - Fix issues in the algorithm.
+  - Add org-roam integration.
+  - Generalize (ir--check-duplicate)
 - 0.6.0: Add session functions (ir-start-session).
 - 0.5.0: Add editing function (ir-edit-update-column).
 - 0.4.0: Add function (ir-add-bibtex-entry).
@@ -36,7 +41,6 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
   - [ ] From YouTube.
   - [ ] From local files.
 - [ ] Change the affinity for priority from INTEGER to REAL.
-- [ ] org-roam integration.
 - [ ] Create a heading of a pdf even if the pdf is not in the db.
 - [ ] Research the possibility of sioyek integration
   
