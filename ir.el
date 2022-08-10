@@ -478,7 +478,7 @@ Part of the ir-read function."
   (goto-char (point-max))
   (backward-delete-char 2)
   (goto-char (point-min))
-  (insert "|ID|AF|Inerval|PR|DATE|TYPE|PATH\n")
+  (insert "|ID|AF|Interval|PR|DATE|TYPE|PATH\n")
   (delete-char 3)
   (insert "|")
   (org-table-align)
