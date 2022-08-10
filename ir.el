@@ -356,16 +356,9 @@ Part of the ir-read function."
   "Start a session."
   (interactive)
   (make-frame '((name . "ir-session")))
-  ;; (select-frame-set-input-focus (next-frame))
-  ;; (toggle-frame-fullscreen)
-  (ir--open-item (ir--query-closest-time))
-  ;; If the material is a pdf, split.
-  (when (equal (file-name-extension (buffer-file-name)) "pdf")
-    (split-window-right)
-    (ir-navigate-to-heading)
-    (other-window 1)
-    (pdf-view-fit-page-to-window)
-    (other-window 1)))
+  (select-frame-by-name "ir-session")
+  (toggle-frame-fullscreen)
+  (ir--reading-setup (ir--query-closest-time)))
 
 (defun ir-end-session ()
   "End a session."
@@ -385,8 +378,13 @@ Part of the ir-read function."
       (find-file item-path)
       (split-window-horizontally)
       (ir-navigate-to-heading))
-    (when (equal item-type "text")
-      (org-id-open item-id))))
+
+    (when (equal item-type "web")
+      (toggle-frame-fullscreen)
+      (browse-url item-path))
+
+    (when (equal item-type "txt")
+      (org-id-open item-id nil))))
 
 
 
