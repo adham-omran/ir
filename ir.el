@@ -65,7 +65,7 @@
 
 (emacsql ir-db [:create-table :if-not-exists ir
                 ([(id text :primary-key)
-                  (afactor real :default 1.5)
+                  (afactor real :default 1.2)
                   (interval integer :default 1)
                   (priority real :default 50.0)
                   (date integer)
@@ -95,6 +95,15 @@
   (org-id-get-create)
   (org-narrow-to-subtree))
 
+(defun ir--check-duplicate (column value)
+  "Check in COLUMN for VALUE."
+  (emacsql ir-db
+           [:select *
+            :from ir
+            :where (= $i1 $s2)]
+           column
+           value))
+
                                         ; Import Functions
                                         ; PDF
 (defun ir-add-pdf (path)
@@ -110,7 +119,7 @@
           (message "%s.pdf is already in the database." (file-name-base path))
         (progn
           (ir--create-heading)
-          (ir--insert-item (org-id-get) "pdf" (expand-file-name path)))
+          (ir--insert-item (org-id-get) "pdf" path))
         (find-file path))
     (message "File %s is not a PDF file." path)))
 
@@ -213,17 +222,6 @@ Prime use case it to get the id of a particular query. Note this
 only access the first result."
   (nth (plist-get ir--p-column-names column) query))
 
-(defun ir--check-duplicate (column value)
-  "Check in COLUMN for VALUE."
-  (emacsql ir-db
-           [:select *
-            :from ir
-            :where (= $i1 $s2)]
-           column
-           value))
-
-(ir--check-duplicate 'id "b8b2e884-4d3c-412f-adf1-c71934984d93")
-
 (defun ir--insert-item (id type &optional path)
   "Insert item into `ir' database with TYPE and ID."
   (unless path (setq path nil)) ;; Check if a path has been supplied.
@@ -261,8 +259,8 @@ Part of the ir-read function."
           (old-a (ir--return-column 'afactor item))
           (old-interval (ir--return-column 'interval item))
           (old-date (ir--return-column 'date item)))
-      (ir--update-value (org-id-get) "interval" (round (* old-interval (+ old-a 0.08))))
-      (ir--update-value (org-id-get) "afactor" (+ old-a 0.08))
+      (ir--update-value (org-id-get) "interval" (round (* old-interval old-a)))
+      (ir--update-value (org-id-get) "afactor" (+ old-a 0.015))
       (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
 
                                         ; Extract Functions
@@ -286,6 +284,7 @@ Part of the ir-read function."
 ;; 2. The user is using org-roam.
 ;;
 ;; If the file is not a PDF. Clip the selection into the kill ring. Move into
+
 ;; an org-id heading. Create a subheading and paste.
 (defun ir-extract-region ()
   "Extract from the current active region into appropriate org-id heading."
@@ -343,29 +342,47 @@ Part of the ir-read function."
   "Move to the next item in the queue, compute next interval."
   (interactive)
   ;; TODO How to handle not finding an item.
-  (ir--compute-new-interval)
-  (ir--open-item (ir--query-closest-time)))
+  ;;
+  ;; TODO Update to handle the session style. Perhaps I could check by input and
+  ;; split the window if the type is pdf.
+  (ir--reading-setup (ir--query-closest-time))
+  ;; (ir--open-item (ir--query-closest-time))
+  ;; (ir--compute-new-interval)
+  )
 
 (defun ir-start-session ()
   "Start a session."
   (interactive)
   (make-frame '((name . "ir-session")))
-  (select-frame-set-input-focus (next-frame))
+  (select-frame-by-name "ir-session")
   (toggle-frame-fullscreen)
-  (ir--open-item (ir--query-closest-time))
-  ;; If the material is a PDF, split.
-  (when (equal (file-name-extension (buffer-file-name)) "pdf")
-    (split-window-right)
-    (ir-navigate-to-heading)
-    (other-window 1)
-    (pdf-view-fit-page-to-window)
-    (other-window 1)))
+  (ir--reading-setup (ir--query-closest-time)))
 
 (defun ir-end-session ()
   "End a session."
   (interactive)
   (ir--compute-new-interval)
   (delete-frame))
+
+(defun ir--reading-setup (list)
+  "Prepare the ideal environmet given a LIST."
+  (let ((item-id (nth 0 list))
+        (item-type (nth 5 list))
+        (item-path (nth 6 list)))
+    (message "%s" item-path)
+    ;; Body
+    (when (equal item-type "pdf")
+      (delete-other-windows)
+      (find-file item-path)
+      (split-window-horizontally)
+      (ir-navigate-to-heading))
+
+    (when (equal item-type "web")
+      (toggle-frame-fullscreen)
+      (browse-url item-path))
+
+    (when (equal item-type "txt")
+      (org-id-open item-id nil))))
 
 
 
@@ -394,23 +411,14 @@ Part of the ir-read function."
   (org-narrow-to-subtree))
 
                                         ; Editing Functions
-;; TODO Create (ir-change-priority id)
-;; (ir--update-value) is already complete to change the values
-
-;; (defun ir-edit-change-priority ()
-;;   (interactive))
-
-;; The user interface will be a simple N step process
-
-(defun ir-edit-update-column ()
+(defun ir-edit-column ()
   "Search for an item."
   ;; TODO Date
   (interactive)
-
   (let (
         (lists (let (
                      (column (completing-read "What column do you want to search: "
-                                              '("id" "afactor" "repetitions" "priority" "type" "path") nil t))
+                                              '("id" "afactor" "interval" "priority" "type" "path") nil t))
                      (search-me (completing-read "What to search for: " nil)))
                  ;; Body
                  (emacsql ir-db [:select *
@@ -422,16 +430,15 @@ Part of the ir-read function."
     ;; Find file approach
     (find-file (make-temp-file "ir-view" nil ".org"))
     (erase-buffer)
-    (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists)
 
-    ;; TODO Feedback
-
-    ;; TODO Integer vs String inputs columns.
-
-    ;; TODO Old value
-    (ir--update-value (completing-read "Which result: " lists)
-                      (completing-read "What column do you want to edit? " '("priority" "date") nil t)
-                      (read-number "New value: "))))
+    (ir--view-create-table lists)
+    ;; Update the value
+    (let ((result (completing-read "Which result: " lists))
+          (column-name (completing-read "What column do you want to edit? " '("id" "afactor" "interval" "date" "priority" "type" "path") nil t)))
+      (ir--update-value result
+                        column-name
+      (cond ((member column-name '("id" "afactor" "interval" "priority" "date")) (read-number "New value: "))
+            (t (read-string "New value: ")))))))
 
 ;; 1. Choose what column to search
 ;; 2. Enter search query
@@ -439,10 +446,6 @@ Part of the ir-read function."
 ;; 4. Enter new value
 
                                         ; View & Open Functions
-(defun ir--format-time (N)
-  "Used in a table to convert the N dates into human-readable times."
-  (format-time-string "%F, %R:%S" N))
-
 (defun ir-view-items-by-date ()
   "View all items by their due date."
   (interactive)
@@ -453,26 +456,33 @@ Part of the ir-read function."
                                ])))
     ;; Create a file
     (find-file (make-temp-file "ir-view" nil ".org"))
-    (ir--view-create-table '("ID" "AF" "REP" "PR" "DATE" "TYPE" "PATH") lists)
+    (ir--view-create-table lists)
     (goto-char (point-max))
-    (insert "#+tblfm: @<<$5..@>>$5='(ir--format-time (string-to-number $5))")))
+    (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")))
 
-(defun ir--view-create-table  (list-of-columns lists)
-  "Generate an org-table from sql query using a LIST-OF-COLUMNS and LISTS."
-  ;; Example use (create '("id" "date") '(("123" "23123") ("321" "23123123"))
-  ;; Use list of columns to generate the head
+(defun ir--format-time (N)
+  "Used in a table to convert the N dates into human-readable times."
+  (format-time-string "%F, %R:%S" N))
+
+(defun ir--view-create-table (lists)
+  "Transform a list of LISTS into a table."
   (insert "\n")
-  (org-table-create (format "%sx%s" (length list-of-columns) (length lists)))
-  (dolist (col-name list-of-columns)
-    (org-table-next-field)
-    (insert col-name))
-
-  (dolist (row lists)
-    (dolist (entry row)
-      (org-table-next-field)
-      (insert (format "%s" entry))))
-  (org-table-next-field)
-  (org-table-align))
+  (insert (format "%s" lists))
+  (goto-char (point-min))
+  (while (re-search-forward ") (" nil t)
+    (replace-match "\n|"))
+  (goto-char (point-min))
+  (while (re-search-forward " \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([a-z]*\\) " nil t)
+    (replace-match "|\\1|\\2|\\3|\\4|\\5|"))
+  (goto-char (point-max))
+  (backward-delete-char 2)
+  (goto-char (point-min))
+  (insert "|ID|AF|Interval|PR|DATE|TYPE|PATH\n")
+  (delete-char 3)
+  (insert "|")
+  (org-table-align)
+  (goto-char (point-min))
+  (org-table-insert-hline))
 
 (defun ir--list-type (&optional type)
   "Return a list of items with a type. TYPE optional."
@@ -549,6 +559,8 @@ Part of the ir-read function."
                                         ; Collection Functions
                                         ;; web - firefox
 ;; These functions collect text from the web. They are most useful when configured with a DE/WM.
+
+;; TODO org-protocol?
 
 ;; TODO ir-collect-from-web-selection
 
