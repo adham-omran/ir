@@ -437,7 +437,8 @@ Part of the ir-read function."
           (column-name (completing-read "What column do you want to edit? " '("id" "afactor" "interval" "date" "priority" "type" "path") nil t)))
       (ir--update-value result
                         column-name
-      (cond ((member column-name '("id" "afactor" "interval" "priority" "date")) (read-number "New value: "))
+      (cond ((member column-name '("id" "afactor" "interval" "priority")) (read-number "New value: "))
+            ((member column-name '("date")) (string-to-number (format-time-string "%s" (org-read-date nil 'to-time nil "New date:  "))))
             (t (read-string "New value: ")))))))
 
 ;; 1. Choose what column to search
