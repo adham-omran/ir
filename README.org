@@ -94,3 +94,8 @@ increases by 0.08 per repetition.
 $\text{New Interval} = \text{round}(\text{Old Interval} \times \text{A Factor})$
 
 $\text{New Date} = \text{Old Date} + \text{New Interval}$
+* Adding a file format
+1. Add a (when) to (ir--open-item).
+2. Create a (ir-open-format) function.
+3. Create a (ir-add-format)
+4. Create a (when) to (ir--reading-setup)
