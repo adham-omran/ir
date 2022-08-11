@@ -119,7 +119,7 @@
           (message "%s.pdf is already in the database." (file-name-base path))
         (progn
           (ir--create-heading)
-          (ir--insert-item (org-id-get) "pdf" path))
+          (ir--insert-item (org-id-get) "pdf" (expand-file-name path)))
         (find-file path))
     (message "File %s is not a PDF file." path)))
 
@@ -387,7 +387,9 @@ Part of the ir-read function."
   (delete-frame))
 
 (defun ir--reading-setup (list)
-  "Prepare the ideal environmet given a LIST."
+  "Prepare the ideal environmet given a LIST.
+
+This will open the material."
   (let ((item-id (nth 0 list))
         (item-type (nth 5 list))
         (item-path (nth 6 list)))
