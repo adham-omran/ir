@@ -214,7 +214,7 @@ largest number (farthest date)."
   (nth 0 (emacsql ir-db
                   [:select *
                    :from ir
-                   :order-by (date priority)])))
+                   :order-by date])))
 
 (defun ir--query-by-column (value column &optional return-item)
   "Search for VALUE in COLUMN.
