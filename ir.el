@@ -165,6 +165,25 @@ No clue what INITIAL-INPUT, FILTER-FN or PRED do."
     (cond ((ir--check-duplicate 'id (org-roam-node-id node)) (message "Node already exists."))
           (t (ir--insert-item (org-roam-node-id node) "txt")))))
 
+                                        ; video (local)
+(defun ir-add-video (path)
+  "Select and add a PATH video file to the database."
+  (interactive (list (read-file-name "Select video to add: " nil nil t)))
+  ;; First check if the file is a PDF. Second check if the file has already been
+  ;; added.
+  ;; (setq path '("~/Dropbox/org/tmp/lorem-ipsum.pdf"))
+  ;; (setq path (expand-file-name path))
+
+  (if (member (file-name-extension path) '("webm"))
+      (if (ir--check-duplicate 'path (expand-file-name path))
+          (message "%s is already in the database." (file-name-base path))
+        (progn
+          (ir--create-heading)
+          (ir--insert-item (org-id-get) "vid" (expand-file-name path)))
+        (find-file path))
+    (message "File %s is not a video file." path)))
+
+
                                         ; Database Functions
 (defun ir--open-item (list)
   "Opens an item given a LIST. Usually from a query."
@@ -179,7 +198,10 @@ No clue what INITIAL-INPUT, FILTER-FN or PRED do."
     (when (equal item-type "web")
       (browse-url item-path)
       (ir-navigate-to-heading item-id)
-      (message "Open URL complete."))))
+      (message "Open URL complete."))
+    (when (member item-type '("mp4" "webm"))
+      (async-shell-command (concat "vlc '" item-path "'") nil nil))))
+
 
 (defun ir--query-closest-time ()
   "Query `ir-db' for the most due item.
@@ -382,7 +404,12 @@ Part of the ir-read function."
       (browse-url item-path))
 
     (when (equal item-type "txt")
-      (org-id-open item-id nil))))
+      (org-id-open item-id nil))
+
+    (when (member item-type '("vid"))
+      (message "here")
+      (org-id-open item-id nil)
+      (async-shell-command (concat "vlc '" item-path "'") nil nil))))
 
 
 
@@ -519,14 +546,20 @@ Part of the ir-read function."
 (defun ir-open-pdf ()
   "Open a PDF from those in the `ir-db'."
   (interactive)
-  (let ((file (completing-read "Choose PDF: " (ir--list-paths-of-type (ir--list-type "pdf")))))
-    (find-file file)))
+  (let ((path (completing-read "Choose PDF: " (ir--list-paths-of-type (ir--list-type "pdf")))))
+    (find-file path)))
 
 (defun ir-open-web ()
-  "Open a web article from those in the `ir-db'."
+  "Open a web url from those in the `ir-db'."
   (interactive)
-  (let ((file (completing-read "Choose URL: " (ir--list-paths-of-type (ir--list-type "web")))))
-    (browse-url file)))
+  (let ((path (completing-read "Choose URL: " (ir--list-paths-of-type (ir--list-type "web")))))
+    (browse-url path)))
+
+(defun ir-open-video ()
+  "Open a video file from those in the `ir-db'."
+  (interactive)
+  (let ((path (completing-read "Choose video: " (ir--list-paths-of-type (ir--list-type "vid")))))
+    (async-shell-command (concat "vlc '" path "'") nil nil)))
 
                                         ; Highlighting Functions
 
