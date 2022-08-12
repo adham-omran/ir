@@ -24,6 +24,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 
 * Development
 ** Changelog
+- 0.9.0: Add a generic =(ir-add)=.
 - 0.8.0: Add support for video files.
 - 0.7.1: Add condition to edit date using calendar.
 - 0.7.0:
@@ -38,10 +39,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 - 0.2.0: Add basic persistent highlighting functions.
 - 0.1.0: Initial release with basic extraction functions.
 ** What's Next?
-- [ ] Create a generic =(ir-add)= function.
-- [-] Video.
-  - [ ] From YouTube.
-  - [X] From local files.
+- [ ] ?
 ** Possible Features
 - [ ] Research the possibility of sioyek integration
   
