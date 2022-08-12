@@ -24,6 +24,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 
 * Development
 ** Changelog
+- 0.8.0: Add support for video files.
 - 0.7.1: Add condition to edit date using calendar.
 - 0.7.0:
   - Refactor =(ir-start-session)=.
