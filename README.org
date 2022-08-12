@@ -17,7 +17,7 @@ main features I have implemented so far are *scheduling of material* and
 *extraction from PDFs*.
 
 The current way to create questions and clozes out of the extracts is to write
-them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I want to improve on this in the future.
+them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 
 * Tutorial
 @TODO
@@ -56,6 +56,11 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 I see no reason to implement a way to create basic or cloze questions. This is
 not SuperMemo and I've already worked out a way to create basic and cloze cards
 using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
+** Why =(ir-open)= deletes other windows?
+Since you are not supposed to manually open material. (ir-open) assumes you want
+to take notes on a specific piece of material. So it sets up the frame for that.
+My suggestion is to start a session then use (ir-open) then end the session when
+done with the manual study.
 * Design of the Database
 Using ~emacsql~ I created the following table.
 
@@ -66,7 +71,7 @@ Using ~emacsql~ I created the following table.
 | priority | REAL     | [[https://super-memory.com/help/g.htm#Priority][Priority]]                     |
 | interval | INTEGER  | [[https://super-memory.com/help/g.htm#Interval][Interval]]                     |
 | date     | INTEGER  | Date of next repetition      |
-| type     | TEXT     | Type of file (org-mode, pdf) |
+| type     | TEXT     | Type of file (web, pdf, txt) |
 | path     | TEXT     | Path to file if applicalble  |
 
 One of my goals is to support as many possible file types as possible. This
@@ -80,11 +85,11 @@ file type to a function that opens that file type.
 Such files have a path which is inserted in the path column.
 
 Example
-| File type | Method          | Description.          |
-|-----------+-----------------+-----------------------|
-| text      | org-id-find     | A simple org heading. |
-| pdf       | dired-find-file | A pdf file.           |
-| mp4       | @TODO           | A video.              |
+| File type | Method              | Description.          |
+|-----------+---------------------+-----------------------|
+| text      | org-id-find         | A simple org heading. |
+| pdf       | dired-find-file     | A pdf file.           |
+| mp4       | async-shell-command | A video file.         |
 ** Algorithm Design
 
 I use a simplified SM2 algorithm to calculate the intervals. The A Factor
@@ -98,8 +103,3 @@ $\text{New Date} = \text{Old Date} + \text{New Interval}$
 2. Create =(ir-open-formate)= function.
 3. Create a =(ir-add-format)=
 4. Create a =(when)= to =(ir--reading-setup)=
-* Why =(ir-open)= deletes other windows?
-Since you are not supposed to manually open material. (ir-open) assumes you want
-to take notes on a specific piece of material. So it sets up the frame for that.
-My suggestion is to start a session then use (ir-open) then end the session when
-done with the manual study.
