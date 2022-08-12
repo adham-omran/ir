@@ -24,41 +24,32 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 
 * Development
 ** Changelog
-- 0.7.1: Add condition to edit date using calendar
+- 0.7.1: Add condition to edit date using calendar.
 - 0.7.0:
-  - Refactor (ir-start-session).
+  - Refactor =(ir-start-session)=.
   - Fix issues in the algorithm.
   - Add org-roam integration.
-  - Generalize (ir--check-duplicate)
-- 0.6.0: Add session functions (ir-start-session).
-- 0.5.0: Add editing function (ir-edit-update-column).
-- 0.4.0: Add function (ir-add-bibtex-entry).
+  - Generalize =(ir--check-duplicate)=.
+- 0.6.0: Add session functions =(ir-start-session)=.
+- 0.5.0: Add editing function =(ir-edit-update-column)=.
+- 0.4.0: Add function =(ir-add-bibtex-entry)=.
 - 0.3.0: Add basic view by due functions.
 - 0.2.0: Add basic persistent highlighting functions.
 - 0.1.0: Initial release with basic extraction functions.
 ** What's Next?
-- [ ] Create a generic (ir-add) function.
-- [ ] Create a generic (ir-open) function.
-  - Choose from a menu similar to (org-roam-node-find)
-- [ ] Video playback (vlc vs mpv).
+- [ ] Create a generic =(ir-add)= function.
+- [-] Video.
   - [ ] From YouTube.
-  - [ ] From local files.
-- [ ] Change the affinity for priority from INTEGER to REAL.
-- [ ] Create a heading of a pdf even if the pdf is not in the db.
+  - [X] From local files.
+** Possible Features
 - [ ] Research the possibility of sioyek integration
   
   [[https://github.com/ahrm/sioyek/releases/tag/v1.4.0][Release 1.4.0]] of sioyek adds the ability to control a running instance of
   sioyek with the command line.
 ** Implementation of question creation
-I see a reason to implement a way to create basic or cloze questions. This is
+I see no reason to implement a way to create basic or cloze questions. This is
 not SuperMemo and I've already worked out a way to create basic and cloze cards
-using [[https://www.github.com/adham-omran/ankifier][ankifier.el]]. Such that the form of my final workflow would be:
-
-#+begin_src org
-EXTRACT TEXT
-
-QUESTIONS
-#+end_src
+using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 * Design of the Database
 Using ~emacsql~ I created the following table.
 
@@ -97,7 +88,12 @@ $\text{New Interval} = \text{round}(\text{Old Interval} \times \text{A Factor})$
 
 $\text{New Date} = \text{Old Date} + \text{New Interval}$
 * Adding a file format
-1. Add a (when) to (ir--open-item).
-2. Create a (ir-open-format) function.
-3. Create a (ir-add-format)
-4. Create a (when) to (ir--reading-setup)
+1. Add a =(when)= to =(ir--open-item)=.
+2. Create =(ir-open-formate)= function.
+3. Create a =(ir-add-format)=
+4. Create a =(when)= to =(ir--reading-setup)=
+* Why =(ir-open)= deletes other windows?
+Since you are not supposed to manually open material. (ir-open) assumes you want
+to take notes on a specific piece of material. So it sets up the frame for that.
+My suggestion is to start a session then use (ir-open) then end the session when
+done with the manual study.
