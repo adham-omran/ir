@@ -367,8 +367,6 @@ Part of the ir-read function."
   (interactive)
   ;; TODO How to handle not finding an item.
   ;;
-  ;; TODO Update to handle the session style. Perhaps I could check by input and
-  ;; split the window if the type is pdf.
   (ir--reading-setup (ir--query-closest-time))
   ;; (ir--open-item (ir--query-closest-time))
   ;; (ir--compute-new-interval)
@@ -450,7 +448,6 @@ This will open the material."
                                         ; Editing Functions
 (defun ir-edit-column ()
   "Search for an item."
-  ;; TODO Date
   (interactive)
   (let (
         (lists (let (
