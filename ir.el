@@ -122,6 +122,7 @@
 (defun ir-add-pdf ()
   "Select and add a PATH PDF file to the database."
   ;; (interactive (list (read-file-name "Select PDF to add: " nil nil t)))
+  ;; TODO Remove this
   ;; First check if the file is a PDF. Second check if the file has already been
   ;; added.
   ;; (setq path '("~/Dropbox/org/tmp/lorem-ipsum.pdf"))
@@ -395,6 +396,10 @@ This will open the material."
         (item-path (nth 6 list)))
     (message "%s" item-path)
     ;; Body
+    (when (equal item-type "txt")
+      (org-id-open item-id nil)
+      (org-narrow-to-subtree))
+
     (when (equal item-type "pdf")
       (delete-other-windows)
       (find-file item-path)
@@ -410,11 +415,9 @@ This will open the material."
       (org-id-open item-id nil)
       (org-narrow-to-subtree))
 
-    (when (equal item-type "txt")
-      (org-id-open item-id nil)
-      (org-narrow-to-subtree))
-
     (when (equal item-type "vid")
+      (when (eq (frame-parameter nil 'fullscreen) 'fullboth)
+        (toggle-frame-fullscreen))
       (org-id-open item-id nil)
       (org-narrow-to-subtree)
       (async-shell-command (concat "vlc '" item-path "'") nil nil))))
