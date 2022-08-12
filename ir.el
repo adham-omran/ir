@@ -558,23 +558,5 @@ This will open the material."
   (let ((path (completing-read "Choose material:" (ir--list-paths-of-type (ir--list-type)))))
     (ir--reading-setup (ir--query-by-column path 'path t))))
 
-                                        ; Highlighting Functions
-
-
-
-;; How to handle loading and exporting?
-;;; Simply load highlights for every function that visits a heading. And export
-;;; after every function that highlights.
-
-                                        ; Collection Functions
-                                        ;; web - firefox
-;; These functions collect text from the web. They are most useful when configured with a DE/WM.
-
-;; TODO org-protocol?
-
-;; TODO ir-collect-from-web-selection
-
-;; TODO ir-collect-from-clipboard: Insert \n then insert clipboard.
-
 (provide 'ir)
 ;;; ir.el ends here
