@@ -387,7 +387,7 @@ Part of the ir-read function."
   (delete-frame))
 
 (defun ir--reading-setup (list)
-  "Prepare the ideal environmet given a LIST.
+  "Prepare the ideal environment given a LIST.
 
 This will open the material."
   (let ((item-id (nth 0 list))
