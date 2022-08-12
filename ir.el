@@ -58,6 +58,7 @@
 (defvar ir--p-column-names '(id 0 afactor 1 interval 2 priority 3 date 4
                                 type 5 path 6))
 
+(defvar ir--video-formats '("webm mp4"))
 
 ;; Database creation
 (defvar ir-db (emacsql-sqlite ir-db-location))
@@ -199,7 +200,7 @@ No clue what INITIAL-INPUT, FILTER-FN or PRED do."
       (browse-url item-path)
       (ir-navigate-to-heading item-id)
       (message "Open URL complete."))
-    (when (member item-type '("mp4" "webm"))
+    (when (member item-type ir--video-formats)
       (async-shell-command (concat "vlc '" item-path "'") nil nil))))
 
 
