@@ -138,14 +138,11 @@
           (ir--create-heading)
           (ir--insert-item (org-id-get) "pdf" (expand-file-name path)))
         (find-file path))
-    (message "File %s is not a PDF file." path)))
-
+    (message "File %s is not a PDF file." path))))
 
                                         ; Web
-
-(defun ir-add-web-article ()
+(defun ir-add-web-url ()
   "Add URL of a web article to the database."
-  (interactive)
   (let ((url (read-string "URL: ")))
     (ir--create-heading)
     (ir--insert-item (org-id-get) "web" url)))
@@ -154,7 +151,6 @@
 
 (defun ir-add-bibtex-entry ()
   "Select an entry from bibliography, if there's a file, insert into db."
-  (interactive)
   (let ((ref (citar-select-ref)))
     ;; (message "%s" (assoc "file" ref))
 
@@ -170,36 +166,29 @@
                                         ; org-roam
 (defun ir-add-current-roam-node ()
   "Add the currently visited roam node."
-  (interactive)
   (ir--insert-item (org-id-get) "text"))
 
 (cl-defun ir-add-roam-node-by-find (&optional initial-input filter-fn pred)
   "Find and open an Org-roam node by its title or alias. Then add it.
 
 No clue what INITIAL-INPUT, FILTER-FN or PRED do."
-  (interactive current-prefix-arg)
+  ;; (interactive current-prefix-arg)
   (let ((node (org-roam-node-read initial-input filter-fn pred)))
     (cond ((ir--check-duplicate 'id (org-roam-node-id node)) (message "Node already exists."))
           (t (ir--insert-item (org-roam-node-id node) "txt")))))
 
-                                        ; video (local)
-(defun ir-add-video (path)
+                                        ; video
+(defun ir-add-video ()
   "Select and add a PATH video file to the database."
-  (interactive (list (read-file-name "Select video to add: " nil nil t)))
-  ;; First check if the file is a PDF. Second check if the file has already been
-  ;; added.
-  ;; (setq path '("~/Dropbox/org/tmp/lorem-ipsum.pdf"))
-  ;; (setq path (expand-file-name path))
-
-  (if (member (file-name-extension path) '("webm"))
-      (if (ir--check-duplicate 'path (expand-file-name path))
-          (message "%s is already in the database." (file-name-base path))
-        (progn
-          (ir--create-heading)
-          (ir--insert-item (org-id-get) "vid" (expand-file-name path)))
-        (find-file path))
-    (message "File %s is not a video file." path)))
-
+  (let ((path (read-file-name "Select video to add: " nil nil t)))
+    (if (member (file-name-extension path) ir--video-formats)
+        (if (ir--check-duplicate 'path (expand-file-name path))
+            (message "%s is already in the database." (file-name-base path))
+          (progn
+            (ir--create-heading)
+            (ir--insert-item (org-id-get) "vid" (expand-file-name path)))
+          (find-file path))
+      (message "File %s is not a video file." path))))
 
                                         ; Database Functions
 (defun ir--open-item (list)
