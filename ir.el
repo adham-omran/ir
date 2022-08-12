@@ -44,10 +44,6 @@
   "Location of the extracts."
   :type '(string))
 
-(defcustom ir-highlights-file "~/org/ir-highlights.el"
-  "File to store highlights."
-  :type '(string))
-
 (defcustom ir-return-to-pdf t
   "If t return to the PDF after extracting."
   :type '(boolean))
@@ -567,28 +563,7 @@ This will open the material."
 
                                         ; Highlighting Functions
 
-(defvar ir--highlights-saved (make-hash-table :test 'equal))
 
-(defun ir--highlights-export ()
-  "Exports highlights alist to file."
-  (with-temp-file ir-highlights-file
-    (delete-file ir-highlights-file)
-    (insert (format "(setq %s '%S)\n" 'ir--highlights-saved (symbol-value 'ir--highlights-saved))))
-  (load ir-highlights-file))
-
-(defun ir--highlights-add-highlight ()
-  "Add region to the saved highlight hashtable."
-  ;; TODO Add the ability to highlight one word.
-  (let (
-        (old-list (gethash (org-id-get) ir--highlights-saved))
-        (region (buffer-substring-no-properties (mark) (point))))
-    (puthash (org-id-get) (cons region old-list) ir--highlights-saved)))
-
-(defun ir--highlights-load ()
-  "Load the highlight text for the current org-id."
-  (dolist
-      (i (gethash (org-id-get) ir--highlights-saved))
-    (highlight-phrase i 'hi-blue)))
 
 ;; How to handle loading and exporting?
 ;;; Simply load highlights for every function that visits a heading. And export
