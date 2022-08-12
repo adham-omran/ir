@@ -43,9 +43,15 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier]] but I w
 - [ ] ?
 ** Possible Features
 - [ ] Research the possibility of sioyek integration
-  
+
   [[https://github.com/ahrm/sioyek/releases/tag/v1.4.0][Release 1.4.0]] of sioyek adds the ability to control a running instance of
   sioyek with the command line.
+
+- [ ] Extracts from the browser.
+
+  Functions collect text from the web. Possiblities include =org-protocol=.
+  Possible APIs are =(ir-collect-from-web-selection)= and
+  =(ir-collect-from-clipboard)=.
 ** Implementation of question creation
 I see no reason to implement a way to create basic or cloze questions. This is
 not SuperMemo and I've already worked out a way to create basic and cloze cards
