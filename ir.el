@@ -106,15 +106,31 @@
            value))
 
                                         ; Import Functions
+(defun ir-add (choice)
+  "TODO CHOICE."
+  (interactive (list (completing-read "Material type: " '("bibtex entry"
+                                                          "pdf"
+                                                          "web"
+                                                          "video"
+                                                          "org-roam/current"
+                                                          "org-roam/find"))))
+  (cond ((equal choice "pdf") (ir-add-pdf))
+        ((equal choice "web") (ir-add-web-url))
+        ((equal choice "video") (ir-add-video))
+        ((equal choice "video") (ir-add-video))
+        ((equal choice "org-roam/current") (ir-add-current-roam-node))
+        ((equal choice "org-roam/find") (ir-add-roam-node-by-find))
+        ((equal choice "bibtex entry") (ir-add-bibtex-entry))
+        (t (message "Invalid. Try again."))))
                                         ; PDF
-(defun ir-add-pdf (path)
+(defun ir-add-pdf ()
   "Select and add a PATH PDF file to the database."
-  (interactive (list (read-file-name "Select PDF to add: " nil nil t)))
+  ;; (interactive (list (read-file-name "Select PDF to add: " nil nil t)))
   ;; First check if the file is a PDF. Second check if the file has already been
   ;; added.
   ;; (setq path '("~/Dropbox/org/tmp/lorem-ipsum.pdf"))
   ;; (setq path (expand-file-name path))
-
+  (let ((path (read-file-name "Select PDF to add: " nil nil t)))
   (if (equal (file-name-extension path) "pdf")
       (if (ir--check-duplicate 'path (expand-file-name path))
           (message "%s.pdf is already in the database." (file-name-base path))
