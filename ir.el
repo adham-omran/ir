@@ -402,15 +402,21 @@ This will open the material."
       (ir-navigate-to-heading))
 
     (when (equal item-type "web")
-      (toggle-frame-fullscreen)
-      (browse-url item-path))
+      ; If the frame is full-screen, toggle it off.
+      (when (eq (frame-parameter nil 'fullscreen) 'fullboth)
+        (toggle-frame-fullscreen))
+      (delete-other-windows)
+      (browse-url item-path)
+      (org-id-open item-id nil)
+      (org-narrow-to-subtree))
 
     (when (equal item-type "txt")
-      (org-id-open item-id nil))
-
-    (when (member item-type '("vid"))
-      (message "here")
       (org-id-open item-id nil)
+      (org-narrow-to-subtree))
+
+    (when (equal item-type "vid")
+      (org-id-open item-id nil)
+      (org-narrow-to-subtree)
       (async-shell-command (concat "vlc '" item-path "'") nil nil))))
 
 
@@ -545,23 +551,13 @@ This will open the material."
     (dolist (item list result)
       (push (nth 6 item) result))))
 
-(defun ir-open-pdf ()
-  "Open a PDF from those in the `ir-db'."
+(defun ir-open ()
+  "Doc."
   (interactive)
-  (let ((path (completing-read "Choose PDF: " (ir--list-paths-of-type (ir--list-type "pdf")))))
-    (find-file path)))
-
-(defun ir-open-web ()
-  "Open a web url from those in the `ir-db'."
-  (interactive)
-  (let ((path (completing-read "Choose URL: " (ir--list-paths-of-type (ir--list-type "web")))))
-    (browse-url path)))
-
-(defun ir-open-video ()
-  "Open a video file from those in the `ir-db'."
-  (interactive)
-  (let ((path (completing-read "Choose video: " (ir--list-paths-of-type (ir--list-type "vid")))))
-    (async-shell-command (concat "vlc '" path "'") nil nil)))
+  ;; Choose file format, choose path, find item of that path and return as list
+  ;; to reading-setup.
+  (let ((path (completing-read "Choose material:" (ir--list-paths-of-type (ir--list-type)))))
+    (ir--reading-setup (ir--query-by-column path 'path t))))
 
                                         ; Highlighting Functions
 
