@@ -123,15 +123,15 @@
 (defun ir-add-pdf ()
   "Select and add a PDF file to the database."
   (let ((path (read-file-name "Select PDF to add: " nil nil t)))
-  (if (equal (file-name-extension path) "pdf")
-      (if (ir--check-duplicate 'path (expand-file-name path))
-          (message "%s.pdf is already in the database." (file-name-base path))
-        (progn
-          (ir--create-heading)
-          (ir--insert-item (org-id-get) "pdf" (expand-file-name path))
-          (previous-buffer)
-          (message "Added %s successfully!" path)))
-    (message "File %s is not a PDF file." path))))
+    (if (equal (file-name-extension path) "pdf")
+        (if (ir--check-duplicate 'path (expand-file-name path))
+            (message "%s.pdf is already in the database." (file-name-base path))
+          (progn
+            (ir--create-heading)
+            (ir--insert-item (org-id-get) "pdf" (expand-file-name path))
+            (previous-buffer)
+            (message "Added %s successfully!" path)))
+      (message "File %s is not a PDF file." path))))
 
                                         ; Web
 (defun ir-add-web-url ()
@@ -376,7 +376,7 @@ Part of the ir-read function."
   (interactive)
   (ir--compute-new-interval)
   (when ir-session-in-new-frame
-  (delete-frame)))
+    (delete-frame)))
 
 (defun ir--reading-setup (list)
   "Prepare the ideal environment given a LIST.
@@ -399,7 +399,7 @@ This will open the material."
       (ir-navigate-to-heading))
 
     (when (equal item-type "web")
-      ; If the frame is full-screen, toggle it off.
+      ;; If the frame is full-screen, toggle it off.
       (when (eq (frame-parameter nil 'fullscreen) 'fullboth)
         (toggle-frame-fullscreen))
       (delete-other-windows)
@@ -470,9 +470,9 @@ This will open the material."
           (column-name (completing-read "What column do you want to edit? " '("id" "afactor" "interval" "date" "priority" "type" "path") nil t)))
       (ir--update-value result
                         column-name
-      (cond ((member column-name '("id" "afactor" "interval" "priority")) (read-number "New value: "))
-            ((member column-name '("date")) (string-to-number (format-time-string "%s" (org-read-date nil 'to-time nil "New date:  "))))
-            (t (read-string "New value: ")))))))
+                        (cond ((member column-name '("id" "afactor" "interval" "priority")) (read-number "New value: "))
+                              ((member column-name '("date")) (string-to-number (format-time-string "%s" (org-read-date nil 'to-time nil "New date:  "))))
+                              (t (read-string "New value: ")))))))
 
 ;; 1. Choose what column to search
 ;; 2. Enter search query
@@ -480,7 +480,7 @@ This will open the material."
 ;; 4. Enter new value
 
 (defun ir-delete ()
-    "Delete an item from the database."
+  "Delete an item from the database."
   (interactive)
   (let (
         (lists (let (
