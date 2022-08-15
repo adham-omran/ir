@@ -24,12 +24,15 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 
 * Development
 ** Changelog
+- 0.10.0
+  - Add =(ir-delete)= to delete from the database.
+  - Add =ir-session-in-new-frame= option.
 - 0.9.2: =(ir-add)= no longer opens the material it adds.
 - 0.9.1: Remove highlighting code.
 - 0.9.0: Add a generic =(ir-add)=.
 - 0.8.0: Add support for video files.
 - 0.7.1: Add condition to edit date using calendar.
-- 0.7.0:
+- 0.7.0
   - Refactor =(ir-start-session)=.
   - Fix issues in the algorithm.
   - Add org-roam integration.
