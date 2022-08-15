@@ -184,22 +184,23 @@ No clue what INITIAL-INPUT, FILTER-FN or PRED do."
       (message "File %s is not a video file." path))))
 
                                         ; Database Functions
-(defun ir--open-item (list)
-  "Opens an item given a LIST. Usually from a query."
-  (let ((item-id (nth 0 list))
-        (item-type (nth 5 list))
-        (item-path (nth 6 list)))
-    ;; Body
-    (when (equal item-type "text")
-      (ir-navigate-to-heading item-id))
-    (when (equal item-type "pdf")
-      (find-file item-path))
-    (when (equal item-type "web")
-      (browse-url item-path)
-      (ir-navigate-to-heading item-id)
-      (message "Open URL complete."))
-    (when (member item-type ir--video-formats)
-      (async-shell-command (concat "vlc '" item-path "'") nil nil))))
+;; TODO Remove if no longer in use.
+;; (defun ir--open-item (list)
+;;   "Opens an item given a LIST. Usually from a query."
+;;   (let ((item-id (nth 0 list))
+;;         (item-type (nth 5 list))
+;;         (item-path (nth 6 list)))
+;;     ;; Body
+;;     (when (equal item-type "text")
+;;       (ir-navigate-to-heading item-id))
+;;     (when (equal item-type "pdf")
+;;       (find-file item-path))
+;;     (when (equal item-type "web")
+;;       (browse-url item-path)
+;;       (ir-navigate-to-heading item-id)
+;;       (message "Open URL complete."))
+;;     (when (member item-type ir--video-formats)
+;;       (async-shell-command (concat "vlc '" item-path "'") nil nil))))
 
 
 (defun ir--query-closest-time ()
@@ -418,11 +419,12 @@ This will open the material."
 
 
                                         ; Navigation Functions
-(defun ir-navigate-to-source ()
-  "Navigate to the source of a heading if one exists."
-  (interactive)
-  ;; get the id, use that to get the type, use the path.
-  (ir--open-item (ir--query-by-column (org-id-get) 'id t)))
+;; TODO Remove if no longer in use.
+;; (defun ir-navigate-to-source ()
+;;   "Navigate to the source of a heading if one exists."
+;;   (interactive)
+;;   ;; get the id, use that to get the type, use the path.
+;;   (ir--open-item (ir--query-by-column (org-id-get) 'id t)))
 
 (defun ir-navigate-to-heading (&optional id)
   "Navigate to the heading given ID."
