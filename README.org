@@ -66,7 +66,7 @@ to take notes on a specific piece of material. So it sets up the frame for that.
 My suggestion is to start a session then use (ir-open) then end the session when
 done with the manual study.
 ** Adding a type
-1. Choose an appropriate name for the =type= affinity.
+1. Choose an appropriate name for the =type= column.
 1. Create a =(when)= to =(ir--reading-setup)=
 2. Create =(ir-add-<format>)=.
 * Design of the Database
