@@ -6,7 +6,7 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: June 22, 2022
-;; Version: 0.9.1
+;; Version: 0.9.2
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "24.4"))
@@ -133,8 +133,9 @@
           (message "%s.pdf is already in the database." (file-name-base path))
         (progn
           (ir--create-heading)
-          (ir--insert-item (org-id-get) "pdf" (expand-file-name path)))
-        (find-file path))
+          (ir--insert-item (org-id-get) "pdf" (expand-file-name path))
+          (previous-buffer)
+          (message "Added %s successfully!" path)))
     (message "File %s is not a PDF file." path))))
 
                                         ; Web

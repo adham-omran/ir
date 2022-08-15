@@ -24,6 +24,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 
 * Development
 ** Changelog
+- 0.9.2: =(ir-add)= no longer opens the material it adds.
 - 0.9.1: Remove highlighting code.
 - 0.9.0: Add a generic =(ir-add)=.
 - 0.8.0: Add support for video files.
