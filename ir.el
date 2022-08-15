@@ -488,7 +488,7 @@ This will open the material."
 
 (defun ir--format-time (N)
   "Used in a table to convert the N dates into human-readable times."
-  (format-time-string "%F, %R:%S" N))
+  (format-time-string "%F" N))
 
 (defun ir--view-create-table (lists)
   "Transform a list of LISTS into a table."
