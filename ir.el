@@ -386,6 +386,7 @@ This will open the material."
     (message "%s" item-path)
     ;; Body
     (when (equal item-type "txt")
+      (widen)
       (org-id-open item-id nil)
       (org-narrow-to-subtree))
 
@@ -400,13 +401,16 @@ This will open the material."
       (when (eq (frame-parameter nil 'fullscreen) 'fullboth)
         (toggle-frame-fullscreen))
       (delete-other-windows)
-      (browse-url item-path)
+      (widen)
       (org-id-open item-id nil)
-      (org-narrow-to-subtree))
+      (org-narrow-to-subtree)
+      (browse-url item-path))
 
     (when (equal item-type "vid")
+      (delete-other-windows)
       (when (eq (frame-parameter nil 'fullscreen) 'fullboth)
         (toggle-frame-fullscreen))
+      (widen)
       (org-id-open item-id nil)
       (org-narrow-to-subtree)
       (async-shell-command (concat "vlc '" item-path "'") nil nil))))
