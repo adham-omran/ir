@@ -6,7 +6,7 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: August 15, 2022
-;; Version: 0.10.0
+;; Version: 0.11.0
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "24.4"))

@@ -24,6 +24,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 
 * Development
 ** Changelog
+- 0.11.0: Add =ir-add-only= option.
 - 0.10.0
   - Add =(ir-delete)= to delete from the database.
   - Add =ir-session-in-new-frame= option.
@@ -44,12 +45,17 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 - 0.2.0: Add basic persistent highlighting functions.
 - 0.1.0: Initial release with basic extraction functions.
 ** What's Next?
-- [ ] ?
+- [ ] =(ir-delete-at-point)=
+
+  Delete the entry and its header.
+  - [ ] How to handle children?
 ** Possible Features
 - [ ] Research the possibility of sioyek integration
 
   [[https://github.com/ahrm/sioyek/releases/tag/v1.4.0][Release 1.4.0]] of sioyek adds the ability to control a running instance of
   sioyek with the command line.
+
+- [ ] Batch import.
 
 - [ ] Extracts from the browser.
 
