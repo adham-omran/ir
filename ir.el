@@ -52,13 +52,17 @@
   "If t sessions start in a new frame."
   :type '(boolean))
 
+(defcustom ir-add-only t
+  "If t `(ir-add)' will not open the material after adding it."
+  :type '(boolean))
+
 (defvar ir--list-of-unique-types '()
   "List of unique values. Used for selecting a view.")
 
 (defvar ir--p-column-names '(id 0 afactor 1 interval 2 priority 3 date 4
                                 type 5 path 6))
 
-(defvar ir--video-formats '("webm mp4"))
+(defvar ir--video-formats '("webm" "mp4"))
 
 ;; Database creation
 (defvar ir-db (emacsql-sqlite ir-db-location))
@@ -130,7 +134,9 @@
             (ir--create-heading)
             (ir--insert-item (org-id-get) "pdf" (expand-file-name path))
             (previous-buffer)
-            (message "Added %s successfully!" path)))
+            (message "Added %s successfully!" path)
+            (unless ir-add-only
+              (ir--reading-setup (ir--query-by-column (expand-file-name path) 'path t)))))
       (message "File %s is not a PDF file." path))))
 
                                         ; Web
@@ -138,7 +144,9 @@
   "Add URL of a web article to the database."
   (let ((url (read-string "URL: ")))
     (ir--create-heading)
-    (ir--insert-item (org-id-get) "web" url)))
+    (ir--insert-item (org-id-get) "web" url)
+    (unless ir-add-only
+      (ir--reading-setup (ir--query-by-column url 'path t)))))
 
                                         ; Bibtex
 
@@ -154,7 +162,10 @@
            (progn
              (ir--create-heading)
              (ir--insert-item (org-id-get) "pdf" (cdr (assoc "file" ref)))
-             (find-file (cdr (assoc "file" ref))))))))
+             (previous-buffer)
+             (message "Added \"%s.pdf\" successfully." (file-name-base (cdr (assoc "file" ref))))
+             (unless ir-add-only
+               (ir--reading-setup (ir--query-by-column (cdr (assoc "file" ref))))))))))
 
                                         ; org-roam
 (defun ir-add-current-roam-node ()
@@ -168,7 +179,7 @@ No clue what INITIAL-INPUT, FILTER-FN or PRED do."
   ;; (interactive current-prefix-arg)
   (let ((node (org-roam-node-read initial-input filter-fn pred)))
     (cond ((ir--check-duplicate 'id (org-roam-node-id node)) (message "Node already exists."))
-          (t (ir--insert-item (org-roam-node-id node) "txt")))))
+          (t (ir--insert-item (org-roam-node-id node) "txt")))))  ;; TODO Add ir-add-only
 
                                         ; video
 (defun ir-add-video ()
@@ -179,9 +190,11 @@ No clue what INITIAL-INPUT, FILTER-FN or PRED do."
             (message "%s is already in the database." (file-name-base path))
           (progn
             (ir--create-heading)
-            (ir--insert-item (org-id-get) "vid" (expand-file-name path)))
-          (find-file path))
-      (message "File %s is not a video file." path))))
+            (ir--insert-item (org-id-get) "vid" (expand-file-name path))
+            (message "Added %s.%s successfully." (file-name-base path) (file-name-extension path))
+            (unless ir-add-only
+              (ir--reading-setup (ir--query-by-column (expand-file-name path) 'path t)))))
+      (message "File %s is not a video file. %s is not supported." path (file-name-extension path)))))
 
                                         ; Database Functions
 ;; TODO Remove if no longer in use.
@@ -583,7 +596,7 @@ This will open the material."
   (interactive)
   ;; Choose file format, choose path, find item of that path and return as list
   ;; to reading-setup.
-  (let ((path (completing-read "Choose material:" (ir--list-paths-of-type (ir--list-type)))))
+  (let ((path (completing-read "Choose material: " (ir--list-paths-of-type (ir--list-type)))))
     (ir--reading-setup (ir--query-by-column path 'path t))))
 
 (provide 'ir)
