@@ -476,6 +476,35 @@ This will open the material."
 ;; 3. Choose the column you want to edit
 ;; 4. Enter new value
 
+(defun ir-delete ()
+    "Delete an item from the database."
+  (interactive)
+  (let (
+        (lists (let (
+                     (column (completing-read "What column do you want to search: "
+                                              '("id" "afactor" "interval" "priority" "type" "path") nil t))
+                     (search-me (completing-read "What to search for: " nil)))
+                 ;; Body
+                 (emacsql ir-db [:select *
+                                 :from ir
+                                 :where $i1 :like $s2
+                                 ]
+                          (intern column) ;; Turns a string into a symbol
+                          (concat "%" search-me "%")))))
+    ;; Find file approach
+    (find-file (make-temp-file "ir-view" nil ".org"))
+    (erase-buffer)
+
+    (ir--view-create-table lists)
+    ;; Update the value
+    (let ((delete-this-id (completing-read "Which result to delete?: " lists)))
+      (message "%s" delete-this-id)
+      (emacsql ir-db
+               [:delete :from ir
+                :where (= id $s1)]
+               delete-this-id))))
+
+
                                         ; View & Open Functions
 (defun ir-view-items-by-date ()
   "View all items by their due date."
