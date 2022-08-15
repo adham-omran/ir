@@ -375,7 +375,8 @@ Part of the ir-read function."
   "End a session."
   (interactive)
   (ir--compute-new-interval)
-  (delete-frame))
+  (when ir-session-in-new-frame
+  (delete-frame)))
 
 (defun ir--reading-setup (list)
   "Prepare the ideal environment given a LIST.
