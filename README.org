@@ -65,6 +65,10 @@ Since you are not supposed to manually open material. (ir-open) assumes you want
 to take notes on a specific piece of material. So it sets up the frame for that.
 My suggestion is to start a session then use (ir-open) then end the session when
 done with the manual study.
+** Adding a type
+1. Choose an appropriate name for the =type= affinity.
+1. Create a =(when)= to =(ir--reading-setup)=
+2. Create =(ir-add-<format>)=.
 * Design of the Database
 Using ~emacsql~ I created the following table.
 
@@ -102,8 +106,3 @@ increases by 0.08 per repetition.
 $\text{New Interval} = \text{round}(\text{Old Interval} \times \text{A Factor})$
 
 $\text{New Date} = \text{Old Date} + \text{New Interval}$
-* Adding a file format
-1. Add a =(when)= to =(ir--open-item)=.
-2. Create =(ir-open-formate)= function.
-3. Create a =(ir-add-format)=
-4. Create a =(when)= to =(ir--reading-setup)=
