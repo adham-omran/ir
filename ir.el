@@ -48,6 +48,10 @@
   "If t return to the PDF after extracting."
   :type '(boolean))
 
+(defcustom ir-session-in-new-frame nil
+  "If t sessions start in a new frame."
+  :type '(boolean))
+
 (defvar ir--list-of-unique-types '()
   "List of unique values. Used for selecting a view.")
 
@@ -354,19 +358,16 @@ Part of the ir-read function."
 (defun ir-read-next ()
   "Move to the next item in the queue, compute next interval."
   (interactive)
-  ;; TODO How to handle not finding an item.
-  ;;
   (ir--reading-setup (ir--query-closest-time))
-  ;; (ir--open-item (ir--query-closest-time))
-  ;; (ir--compute-new-interval)
-  )
+  (ir--compute-new-interval))
 
 (defun ir-start-session ()
   "Start a session."
   (interactive)
-  (make-frame '((name . "ir-session")))
-  (select-frame-by-name "ir-session")
-  (toggle-frame-fullscreen)
+  (when ir-session-in-new-frame
+    (make-frame '((name . "ir-session")))
+    (select-frame-by-name "ir-session")
+    (toggle-frame-fullscreen))
   (ir--reading-setup (ir--query-closest-time)))
 
 (defun ir-end-session ()
