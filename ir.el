@@ -70,7 +70,6 @@
                   (path text)
                   ])])
 
-                                        ; TODO Improve how headings are created.
 (defun ir--create-heading ()
   "Create heading with an org-id."
   (org-open-file ir-extracts-file)
@@ -78,7 +77,6 @@
   (goto-char (point-max))
   (insert "\n") ; For safety
   (insert "* ")
-  ;; TODO Better heading name.
   (insert (format "%s" (current-time)) "\n")
   (org-id-get-create)
   (org-narrow-to-subtree))
@@ -87,7 +85,6 @@
   "Create subheading with an org-id."
   (org-open-file ir-extracts-file)
   (org-insert-subheading 1)
-  ;; TODO Better heading name.
   (insert (format "%s" (current-time)) "\n")
   (org-id-get-create)
   (org-narrow-to-subtree))
@@ -103,7 +100,7 @@
 
                                         ; Import Functions
 (defun ir-add (choice)
-  "TODO CHOICE."
+  "Add material of CHOICE type."
   (interactive (list (completing-read "Material type: " '("bibtex entry"
                                                           "pdf"
                                                           "web"
@@ -120,13 +117,7 @@
         (t (message "Invalid. Try again."))))
                                         ; PDF
 (defun ir-add-pdf ()
-  "Select and add a PATH PDF file to the database."
-  ;; (interactive (list (read-file-name "Select PDF to add: " nil nil t)))
-  ;; TODO Remove this
-  ;; First check if the file is a PDF. Second check if the file has already been
-  ;; added.
-  ;; (setq path '("~/Dropbox/org/tmp/lorem-ipsum.pdf"))
-  ;; (setq path (expand-file-name path))
+  "Select and add a PDF file to the database."
   (let ((path (read-file-name "Select PDF to add: " nil nil t)))
   (if (equal (file-name-extension path) "pdf")
       (if (ir--check-duplicate 'path (expand-file-name path))
@@ -212,8 +203,6 @@ No clue what INITIAL-INPUT, FILTER-FN or PRED do."
 
 The order is first by time from smallest number (closest date) to
 largest number (farthest date)."
-  ;; TODO Refactor to use ir-return.
-  ;;
   ;; TODO Enable sorting by priority.
   (nth 0 (emacsql ir-db
                   [:select *
@@ -324,13 +313,11 @@ Part of the ir-read function."
              (message "No active region.")))
 
     (kill-ring-save (region-beginning) (region-end))
-    (ir--highlights-add-highlight)
     (deactivate-mark)
     ;; Check if we're in `ir-extracts-file'.
     (if (ir--extracts-location-p)
         (progn
           (org-insert-subheading nil)
-          ;; TODO Better heading name.
           (insert (format "%s" (current-time)) "\n")
           (org-id-get-create)
           (yank)
