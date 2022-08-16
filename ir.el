@@ -537,7 +537,9 @@ This will open the material."
     (find-file (make-temp-file "ir-view" nil ".org"))
     (ir--view-create-table lists)
     (goto-char (point-max))
-    (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")))
+    (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")
+    (while (re-search-backward "/home/.*/")
+      (replace-match ""))))
 
 (defun ir--format-time (N)
   "Used in a table to convert the N dates into human-readable times."
