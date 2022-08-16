@@ -401,9 +401,12 @@ This will open the material."
     (message "%s" item-path)
     ;; Body
     (when (equal item-type "txt")
+      (delete-other-windows)
       (widen)
       (org-id-open item-id nil)
-      (org-narrow-to-subtree))
+      (condition-case nil
+          (org-narrow-to-subtree)
+        (error nil)))
 
     (when (equal item-type "pdf")
       (delete-other-windows)
