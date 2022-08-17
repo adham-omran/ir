@@ -46,6 +46,15 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 - 0.2.0: Add basic persistent highlighting functions.
 - 0.1.0: Initial release with basic extraction functions.
 ** What's Next?
+- [ ] Add table view for one type.
+
+  Similar mechanic to =(ir-add)= where =(ir-view)= shows a menu {=by-date=, =by-date=}.
+- [ ] =(ir-validate)=
+
+  Check every =id= in the database and whether or not its heading exists.
+- [ ] =(ir-reset)=
+
+  Reset all items to default values.
 - [ ] =(ir-delete-at-point)=
 
   Delete the entry and its header.
