@@ -48,7 +48,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 ** What's Next?
 - [ ] Add table view for one type.
 
-  Similar mechanic to =(ir-add)= where =(ir-view)= shows a menu {=by-date=, =by-date=}.
+  Similar mechanic to =(ir-add)= where =(ir-view)= shows a menu {=by-date=, =by-type=}.
 - [ ] =(ir-validate)=
 
   Check every =id= in the database and whether or not its heading exists.
