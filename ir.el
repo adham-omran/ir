@@ -145,6 +145,7 @@
   (let ((url (read-string "URL: ")))
     (ir--create-heading)
     (ir--insert-item (org-id-get) "web" url)
+    (previous-buffer)
     (unless ir-add-only
       (ir--reading-setup (ir--query-by-column url 'path t)))))
 
