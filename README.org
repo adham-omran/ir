@@ -24,6 +24,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 
 * Development
 ** Changelog
+- 0.12.0: Add generic =(ir-view)=.
 - 0.11.1: Enhance =(ir-view-items-by-date)=.
 - 0.11.0: Add =ir-add-only= option.
 - 0.10.0
