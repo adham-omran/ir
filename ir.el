@@ -533,9 +533,33 @@ This will open the material."
 
 
                                         ; View & Open Functions
+(defun ir-view (choice)
+  "View of by CHOICE."
+  (interactive (list (completing-read "Material type: " '("by date"
+                                                          "by type"))))
+  (cond ((equal choice "by date") (ir-view-items-by-date))
+        ((equal choice "by type") (ir-view-items-by-type))))
+
+(defun ir-view-items-by-type ()
+  "View TODO."
+  (let ((lists (let ((column (completing-read "Type: " ir--list-of-unique-types nil t)))
+                 (emacsql ir-db [:select *
+                                 :from ir
+                                 :where type :like $s1
+                                 ]
+                          column))))
+
+    (find-file (make-temp-file "ir-view" nil ".org"))
+    (ir--view-create-table lists)
+    (goto-char (point-max))
+    (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")
+    (condition-case nil
+        (while (re-search-backward "/home/.*/")
+          (replace-match ""))
+      (error nil))))
+
 (defun ir-view-items-by-date ()
   "View all items by their due date."
-  (interactive)
   (let ((lists (emacsql ir-db [
                                :select *
                                :from ir
