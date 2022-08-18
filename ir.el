@@ -154,7 +154,6 @@
 (defun ir-add-bibtex-entry ()
   "Select an entry from bibliography, if there's a file, insert into db."
   (let ((ref (citar-select-ref)))
-    ;; TODO Fix
     (cond ((equal (citar-get-value 'file ref) nil) (message "No file."))
           ((ir--check-duplicate 'path (citar-get-value 'file ref))
            (message "%s.pdf already exists." (file-name-base (citar-get-value 'file ref))))
@@ -276,12 +275,12 @@ only access the first result."
            column))
 
 ;; (defun ir-reset ()
-  ;; "Reset all items in the database to defalut values."
-  ;; (emacsql ir-db [
-                  ;; :update ir
-                  ;; :set 'afactor := 1.2
-                  ;; :set 'priority := 50
-                  ;; ]))
+;; "Reset all items in the database to defalut values."
+;; (emacsql ir-db [
+;; :update ir
+;; :set 'afactor := 1.2
+;; :set 'priority := 50
+;; ]))
 
 
                                         ; Algorithm Functions
@@ -629,7 +628,7 @@ This will open the material."
       (push (nth 6 item) result))))
 
 (defun ir-open ()
-  "Doc."
+  "Doc. TODO."
   (interactive)
   ;; Choose file format, choose path, find item of that path and return as list
   ;; to reading-setup.
