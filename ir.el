@@ -275,6 +275,14 @@ only access the first result."
            (list (vector id))
            column))
 
+;; (defun ir-reset ()
+  ;; "Reset all items in the database to defalut values."
+  ;; (emacsql ir-db [
+                  ;; :update ir
+                  ;; :set 'afactor := 1.2
+                  ;; :set 'priority := 50
+                  ;; ]))
+
 
                                         ; Algorithm Functions
 (defun ir--compute-new-interval ()
