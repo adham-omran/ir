@@ -154,19 +154,18 @@
 (defun ir-add-bibtex-entry ()
   "Select an entry from bibliography, if there's a file, insert into db."
   (let ((ref (citar-select-ref)))
-    ;; (message "%s" (assoc "file" ref))
-
-    (cond ((equal (assoc "has-file" ref) nil) (message "No file."))
-          ((ir--check-duplicate 'path (cdr (assoc "file" ref)))
-           (message "%s.pdf already exists." (file-name-base (cdr (assoc "file" ref)))))
-          (t
+    ;; TODO Fix
+    (cond ((equal (citar-get-value 'file ref) nil) (message "No file."))
+          ((ir--check-duplicate 'path (citar-get-value 'file ref))
+           (message "%s.pdf already exists." (file-name-base (citar-get-value 'file ref))))
+          (ref
            (progn
              (ir--create-heading)
-             (ir--insert-item (org-id-get) "pdf" (cdr (assoc "file" ref)))
+             (ir--insert-item (org-id-get) "pdf" (citar-get-value 'file ref))
              (previous-buffer)
-             (message "Added \"%s.pdf\" successfully." (file-name-base (cdr (assoc "file" ref))))
-             (unless ir-add-only
-               (ir--reading-setup (ir--query-by-column (cdr (assoc "file" ref))))))))))
+             (message "Added \"%s.pdf\" successfully." (file-name-base (citar-get-value 'file ref)))
+             (unless ir-add-only ;; TODO TEST
+               (ir--reading-setup (ir--query-by-column (citar-get-value 'file ref)) 'path)))))))
 
                                         ; org-roam
 (defun ir-add-current-roam-node ()
