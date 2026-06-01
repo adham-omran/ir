@@ -36,6 +36,9 @@
 (declare-function org-roam-node-list "ext:org-roam")
 (declare-function org-roam-node-from-id "ext:org-roam")
 (declare-function org-roam-node-title "ext:org-roam")
+(declare-function org-roam-node-file "ext:org-roam")
+(declare-function org-roam-backlinks-get "ext:org-roam")
+(declare-function org-roam-db-clear-file "ext:org-roam")
 (defvar org-roam-directory)
 
 (defgroup ir nil
@@ -55,6 +58,15 @@
   "Amount the A-Factor grows on each review.
 Higher values make review intervals lengthen faster."
   :type 'number)
+
+(defcustom ir-delete-to-trash t
+  "If non-nil, `ir-done-and-delete' moves a deleted file to the OS trash."
+  :type 'boolean)
+
+(defcustom ir-done-log-file "~/org/ir-done.org"
+  "File to which `ir-done-and-delete' appends a completion record.
+Set to nil to disable logging."
+  :type '(choice file (const nil)))
 
 ;; --- Datastore (native sqlite.el) -------------------------------------------
 
@@ -475,6 +487,107 @@ plus that many days, and editing `due' sets the next date directly."
   (let ((id (ir--read-id "Delete item: ")))
     (ir--delete id)
     (message "IR: deleted %s" id)))
+
+;; --- Done & delete ----------------------------------------------------------
+
+(defun ir--id-file (id)
+  "Return the file containing org-id ID, or nil, without visiting any file.
+Uses the Org-roam database when available, else `org-id-locations'."
+  (or (and (require 'org-roam nil t)
+           (ignore-errors (org-roam-node-file (org-roam-node-from-id id))))
+      (org-id-find-id-file id)))
+
+(defun ir--queued-ids-in-file (file)
+  "Return the queued ids whose heading lives in FILE."
+  (let ((true (file-truename file)))
+    (cl-remove-if-not
+     (lambda (id)
+       (let ((f (ir--id-file id)))
+         (and f (equal (file-truename f) true))))
+     (ir--all-ids))))
+
+(defun ir--backlink-count (id)
+  "Return how many notes link to ID via Org-roam, or 0 when unavailable.
+Reads the roam database; visits no file."
+  (or (and (require 'org-roam nil t)
+           (ignore-errors
+             (let ((node (org-roam-node-from-id id)))
+               (and node (length (org-roam-backlinks-get node :unique t))))))
+      0))
+
+(defun ir--log-done (id title)
+  "Append a completion record for ID/TITLE to `ir-done-log-file'.
+No-op when `ir-done-log-file' is nil."
+  (when ir-done-log-file
+    (write-region
+     (format "- %s :: %s (%s)\n" (format-time-string "%F %T") (or title "?") id)
+     nil (expand-file-name ir-done-log-file) 'append 'silent)))
+
+(defun ir--done-delete-file (id file siblings)
+  "Trash FILE, drop ID and SIBLINGS rows, clear the roam db, kill the buffer.
+Postcondition: FILE is gone (to trash when `ir-delete-to-trash'); no queue row
+references FILE; no live buffer visits it."
+  (let ((buf (find-buffer-visiting file)))
+    (dolist (sid (cons id siblings)) (ir--delete sid))
+    (when (and (require 'org-roam nil t) (fboundp 'org-roam-db-clear-file))
+      (ignore-errors (org-roam-db-clear-file file)))
+    (delete-file file ir-delete-to-trash)
+    (when (buffer-live-p buf)
+      (with-current-buffer buf (set-buffer-modified-p nil))
+      (kill-buffer buf))
+    (message "IR: deleted %s and %d row(s)"
+             (abbreviate-file-name file) (1+ (length siblings)))))
+
+(defun ir--done-cut-subtree (id)
+  "Cut the subtree at point to the `kill-ring', save the file, and drop ID's row.
+Postcondition: the heading's subtree is removed from the file (recoverable via
+`yank' within the session); ID has no queue row."
+  (org-back-to-heading t)
+  (org-cut-subtree)
+  (save-buffer)
+  (ir--delete id)
+  (message "IR: cut subtree (saved to kill-ring) and removed %s" id))
+
+;;;###autoload
+(defun ir-done-and-delete ()
+  "Complete the queued item at point: remove it from disk and the queue.
+A file-level node deletes its file; a heading cuts its subtree (file kept).
+Logs the completion to `ir-done-log-file', then confirms -- disclosing other
+queued items in the file and incoming backlinks -- before deleting.
+Precondition: point is within a queued item in an Org buffer."
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "IR: ir-done-and-delete works only in Org buffers"))
+  (let ((id (ir--id-at-point)))
+    (unless (and id (ir--item id))
+      (user-error "IR: point is not on a queued item"))
+    (let* ((file-level (org-before-first-heading-p))
+           (title (if file-level
+                      (ir--id-title id)
+                    (save-excursion (org-back-to-heading t)
+                                    (org-get-heading t t t t))))
+           (file (and file-level (or (buffer-file-name) (ir--id-file id))))
+           (siblings (and file-level (remove id (ir--queued-ids-in-file file))))
+           (backlinks (ir--backlink-count id)))
+      (when (and file-level (not file))
+        (user-error "IR: cannot resolve the file for %s" id))
+      (when (yes-or-no-p
+             (format "%s%s%s? "
+                     (if file-level
+                         (format "Delete file %s%s" (abbreviate-file-name file)
+                                 (if ir-delete-to-trash " (to trash)" ""))
+                       (format "Cut subtree \"%s\" (to kill-ring)" title))
+                     (if siblings
+                         (format " -- also drops %d queued row(s) here"
+                                 (length siblings))
+                       "")
+                     (if (> backlinks 0)
+                         (format " -- %d backlink(s) will dangle" backlinks)
+                       "")))
+        (ir--log-done id title)
+        (if file-level
+            (ir--done-delete-file id file siblings)
+          (ir--done-cut-subtree id))))))
 
 ;;;###autoload
 (defun ir-open ()
