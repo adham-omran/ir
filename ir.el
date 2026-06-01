@@ -202,6 +202,7 @@ Caller bug (reported, not signalled) if point is not within a queued heading."
 
 ;; --- Import: register an existing org-id ------------------------------------
 
+;;;###autoload
 (defun ir-add ()
   "Queue the Org heading at point for incremental reading.
 Precondition: point is within an Org heading.
@@ -212,6 +213,7 @@ Postcondition: the heading has an org-id and exactly one queue row."
         (message "IR: queued %s" id)
       (message "IR: already queued"))))
 
+;;;###autoload
 (defun ir-add-roam-node ()
   "Queue an Org-roam node selected by completion.
 Precondition: `org-roam' is installed.
@@ -223,6 +225,7 @@ Postcondition: the node's id has exactly one queue row."
         (message "IR: queued node %s" id)
       (message "IR: node already queued"))))
 
+;;;###autoload
 (defun ir-add-roam-directory ()
   "Queue every Org-roam node for incremental reading.
 Precondition: `org-roam' is installed and `org-roam-directory' names a
@@ -269,6 +272,7 @@ TEXT as its body; return the child's org-id."
     (org-back-to-heading t)
     (org-id-get)))
 
+;;;###autoload
 (defun ir-extract-region ()
   "Extract the active region into a scheduled child heading, copied in place.
 Precondition: an Org buffer with an active region under a heading.
@@ -331,6 +335,7 @@ Return `ok' on success, `deleted' if a missing heading's orphan row was removed,
         ('deleted (ir--open-next))
         ('kept (message "IR: skipped orphan %s" (plist-get item :id)))))))
 
+;;;###autoload
 (defun ir-start-session ()
   "Begin a review session at the most-due item.
 Postcondition: with `ir-session-in-new-frame', a fullscreen frame named
@@ -342,6 +347,7 @@ Postcondition: with `ir-session-in-new-frame', a fullscreen frame named
     (toggle-frame-fullscreen))
   (ir--open-next))
 
+;;;###autoload
 (defun ir-read-next ()
   "Reschedule the item under review, then open the next due one.
 Precondition: point is within the heading of the item under review."
@@ -349,6 +355,7 @@ Precondition: point is within the heading of the item under review."
   (ir--reschedule-current)
   (ir--open-next))
 
+;;;###autoload
 (defun ir-end-session ()
   "Reschedule the item under review and end the session."
   (interactive)
@@ -356,6 +363,7 @@ Precondition: point is within the heading of the item under review."
   (when ir-session-in-new-frame
     (delete-frame)))
 
+;;;###autoload
 (defun ir-validate ()
   "Report queued ids whose Org heading no longer exists; mutate nothing."
   (interactive)
@@ -365,6 +373,7 @@ Precondition: point is within the heading of the item under review."
 
 ;; --- Navigation -------------------------------------------------------------
 
+;;;###autoload
 (defun ir-navigate-to-heading (&optional id)
   "Jump to the Org heading for ID, widened then narrowed.
 ID defaults to the org-id at point.  Precondition: ID resolves to a heading."
@@ -392,6 +401,7 @@ ID defaults to the org-id at point.  Precondition: ID resolves to a heading."
                        (ir--all-ids))))
     (cdr (assoc (completing-read prompt alist nil t) alist))))
 
+;;;###autoload
 (defun ir-view ()
   "Show all queued items as an Org table ordered by due date."
   (interactive)
@@ -411,6 +421,7 @@ ID defaults to the org-id at point.  Precondition: ID resolves to a heading."
     (goto-char (point-min))
     (org-table-align)))
 
+;;;###autoload
 (defun ir-edit ()
   "Edit one scheduling column of a queued item chosen by completion.
 The id column is immutable; editing `interval' reschedules `due' to now
@@ -431,6 +442,7 @@ plus that many days, and editing `due' sets the next date directly."
        (ir--update-column id column (read-number (format "New %s: " column)))))
     (message "IR: updated %s of %s" column id)))
 
+;;;###autoload
 (defun ir-delete ()
   "Delete a queued item's row chosen by completion; leave its heading intact."
   (interactive)
@@ -438,11 +450,13 @@ plus that many days, and editing `due' sets the next date directly."
     (ir--delete id)
     (message "IR: deleted %s" id)))
 
+;;;###autoload
 (defun ir-open ()
   "Open a queued item chosen by title, narrowed for reading."
   (interactive)
   (ir--reading-setup (ir--item (ir--read-id "Open item: "))))
 
+;;;###autoload
 (defun ir-find-item-at-point ()
   "Echo the queue row for the org-id of the heading at point."
   (interactive)
