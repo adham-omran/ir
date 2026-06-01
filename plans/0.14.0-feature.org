@@ -1,0 +1,75 @@
+#+title: ir.el 0.14.0 — (ir-done-and-delete)
+#+date: 2026-06-01
+#+startup: content
+
+* Status
+Specced, not implemented. Target: 0.14.0. Destructive (deletes files), so
+confirmation + the file-vs-heading branch are non-negotiable.
+
+* Goal
+=(ir-done-and-delete)= removes the item at point from both disk and the queue,
+choosing delete-file vs delete-subtree by node shape, with an informed
+confirmation.
+
+* Decisions locked
+| Fork                 | Resolution                                                            |
+|----------------------+-----------------------------------------------------------------------|
+| Heading items        | cut the subtree (=org-cut-subtree=) + delete row; keep the file       |
+| File-level nodes     | delete the file                                                       |
+| Trash vs permanent   | OS trash (recoverable); =ir-delete-to-trash= default t                |
+| "done" record        | append timestamp/title/id to =ir-done-log-file= before deleting       |
+| Collateral           | inform-then-proceed (no abort): confirmation shows counts             |
+| Backlinks            | disclose incoming-link count; do NOT auto-repair foreign files        |
+
+* Confirmed mechanics (research)
+- File-vs-heading detection: =org-before-first-heading-p= (same predicate as =ir--narrow-to-item=).
+- id -> file: =org-id-find-id-file= / =org-roam-node-file=.
+- Delete file: =delete-file= (TRASH arg for trash); org-roam advises =delete-file :before= (=org-roam-db-autosync--delete-file-a=, org-roam-db.el:651) so the roam db self-cleans when autosync is on; else =org-roam-db-clear-file=.
+- Cut a heading: =org-cut-subtree= (lands in kill-ring, recoverable via yank).
+- Incoming references: =org-roam-backlinks-get= (org-roam-mode.el:481) / =links= table =dest= column — a db query, no file I/O.
+- =delete-by-moving-to-trash= defaults nil -> =delete-file= is permanent unless TRASH is passed.
+
+* Contract
+- pre: point in an Org buffer, on/within a queued item (=ir--id-at-point= in db).
+- post: completion logged; the unit's db row(s) gone; file-level -> file in trash; heading -> subtree cut (file kept); roam db + buffer consistent; foreign backlinks disclosed (left dangling).
+- invariant: no deletion without an informed confirmation; a heading item never deletes a file.
+
+* WBS
+
+** 1 Command (interactive)
+- [ ] 1.1 =MUST= =id = ir--id-at-point=; require Org buffer + =(ir--item id)=; else =user-error=. Verify: non-queued/non-Org point -> message, no change.
+- [ ] 1.2 =MUST= Classify via =org-before-first-heading-p=. Verify: file vs heading path chosen.
+- [ ] 1.3 =MUST= Gather collateral without file I/O: sibling queued ids whose file = this file (file path only) + =org-roam-backlinks-get= count. Verify: counts computed.
+- [ ] 1.4 =MUST= Informed confirm: names target + "N queued items here, M backlinks" + trash/permanent. Verify: decline -> no log, no deletion, no db change.
+- [ ] 1.5 =SHOULD= Append =timestamp . title . id= to =ir-done-log-file= BEFORE deleting (title still resolvable). Verify: log line present after a confirmed run.
+
+** 2 File-level path
+- [ ] 2.1 =MUST= file = =buffer-file-name= / =org-id-find-id-file=. Verify: correct file.
+- [ ] 2.2 =MUST= Delete file to trash per =ir-delete-to-trash=. Verify: file in trash, gone from path.
+- [ ] 2.3 =MUST= =ir--delete= this id AND sibling queued rows in that file. Verify: no queue row references the file.
+- [ ] 2.4 =SHOULD= =org-roam-db-clear-file= when org-roam loaded. Verify: roam db has no node for the file.
+- [ ] 2.5 =SHOULD= Kill the file's visited buffer. Verify: no live buffer.
+
+** 3 Heading path
+- [ ] 3.1 =MUST= =org-cut-subtree= (recoverable via kill-ring) + =ir--delete= this id; file kept. Verify: heading gone, file intact, row gone.
+
+** 4 Backlinks
+- [ ] 4.1 =MUST= Disclose incoming backlink count in 1.4. Verify: a linked node shows M before deletion.
+- [ ] 4.2 =WONT= Auto-edit foreign files to repair dangling links. Verify: foreign files untouched.
+
+** 5 Customization
+- [ ] 5.1 =MUST= =ir-delete-to-trash= (default t). Verify: controls the TRASH arg.
+- [ ] 5.2 =MUST= =ir-done-log-file= (default =~/org/ir-done.org=). Verify: bound; log target.
+
+** 6 Verification
+- [ ] 6.1 =MUST= Headless: file-level node -> confirm -> file removed + row gone + log written (test with trash nil in a temp dir).
+- [ ] 6.2 =MUST= Headless: heading item -> subtree cut + row gone + file intact + log.
+- [ ] 6.3 =MUST= Headless: decline -> nothing deleted, no log.
+- [ ] 6.4 =MUST= Headless: file with a sibling queued id -> both rows removed + file gone.
+- [ ] 6.5 =SHOULD= Backlink count surfaced (mock =org-roam-backlinks-get=).
+- [ ] 6.6 =SHOULD= byte-compile + checkdoc clean (0/0).
+
+** 7 Out of scope
+- [ ] 7.1 =WONT= schema change / =path= column.
+- [ ] 7.2 =WONT= repair foreign backlinks.
+- [ ] 7.3 =WONT= restore beyond OS trash / kill-ring.
