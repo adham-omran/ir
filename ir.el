@@ -1,6 +1,6 @@
 ;;; ir.el --- Incremental Reading -*- lexical-binding: t; -*-
 ;;
-;; Copyright (C) 2022 Adham Omran
+;; Copyright (C) 2026 Adham Omran
 ;;
 ;; Author: Adham Omran <adham.rasoul@gmail.com>
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
@@ -319,20 +319,22 @@ Postcondition: an item plist with due <= now, ordered by priority then due."
 (defun ir--reading-setup (item)
   "Open ITEM's heading for review, narrowed and alone in the frame.
 Precondition: ITEM is an item plist.
+Loads `org-roam' when available so its `org-id-find' advice resolves roam-node
+ids from the roam database.
 Return `ok' on success, or `unresolved' when the id cannot be opened.  Never
-deletes: an open failure does not prove the heading is gone -- the id may merely
-be absent from `org-id-locations' (e.g. roam nodes before a
-`org-roam-update-org-id-locations')."
+deletes: an open failure does not prove the heading is gone; the id may be
+unindexed -- sync with `org-roam-db-sync'."
   (let ((id (plist-get item :id)))
     (condition-case nil
         (progn
+          (require 'org-roam nil t)
           (delete-other-windows)
           (org-id-open id nil)
           (widen)
           (org-narrow-to-subtree)
           'ok)
       (error
-       (message "IR: cannot open %s (heading missing, or id not indexed -- try M-x org-roam-update-org-id-locations)" id)
+       (message "IR: cannot open %s (heading missing or id not indexed -- try M-x org-roam-db-sync)" id)
        'unresolved))))
 
 (defun ir--open-next ()

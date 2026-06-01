@@ -22,7 +22,22 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]]. PDF
 application and is no longer part of this package.
 
 * Tutorial
-@TODO
+** Add material
+- Put point on any Org heading (plain Org or an Org-roam node) and run =M-x ir-add= to queue it.
+- =M-x ir-add-roam-node= queues an Org-roam node chosen by title.
+- =M-x ir-add-roam-directory= queues every Org-roam node at once.
+- While reading, select a region and run =M-x ir-extract-region= to carve it into a scheduled child heading (the parent text is kept).
+
+** Read on a schedule
+1. =M-x ir-start-session= opens the most-due item and narrows you into it. Run it from anywhere.
+2. Read the item. Extract fragments with =ir-extract-region= as you go.
+3. =M-x ir-read-next= records this item (advances its interval) and opens the next. Run it from within the item — the session keeps point there.
+4. Repeat until you see "queue empty for today".
+5. =M-x ir-end-session= records the last item and ends the session (closing the session frame if =ir-session-in-new-frame= is set).
+
+If =ir-start-session= reports "cannot open ... id not indexed" for Org-roam
+nodes, sync the Org-roam database with =M-x org-roam-db-sync= so the ids
+resolve.
 
 * Development
 ** Changelog
