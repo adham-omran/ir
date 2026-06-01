@@ -319,8 +319,10 @@ Postcondition: an item plist with due <= now, ordered by priority then due."
 (defun ir--reading-setup (item)
   "Open ITEM's heading for review, narrowed and alone in the frame.
 Precondition: ITEM is an item plist.
-Return `ok' on success, `deleted' if a missing heading's orphan row was removed,
-`kept' if the orphan was left in place."
+Return `ok' on success, or `unresolved' when the id cannot be opened.  Never
+deletes: an open failure does not prove the heading is gone -- the id may merely
+be absent from `org-id-locations' (e.g. roam nodes before a
+`org-roam-update-org-id-locations')."
   (let ((id (plist-get item :id)))
     (condition-case nil
         (progn
@@ -330,19 +332,16 @@ Return `ok' on success, `deleted' if a missing heading's orphan row was removed,
           (org-narrow-to-subtree)
           'ok)
       (error
-       (if (yes-or-no-p (format "IR: no heading for %s -- delete orphan row? " id))
-           (progn (ir--delete id) 'deleted)
-         'kept)))))
+       (message "IR: cannot open %s (heading missing, or id not indexed -- try M-x org-roam-update-org-id-locations)" id)
+       'unresolved))))
 
 (defun ir--open-next ()
-  "Open the next due item, skipping deleted orphans; message when none is due."
+  "Open the next due item; message when none is due or it cannot be opened."
   (let ((item (ir--query-due)))
     (if (null item)
         (message "IR: queue empty for today")
-      (pcase (ir--reading-setup item)
-        ('ok item)
-        ('deleted (ir--open-next))
-        ('kept (message "IR: skipped orphan %s" (plist-get item :id)))))))
+      (when (eq (ir--reading-setup item) 'ok)
+        item))))
 
 ;;;###autoload
 (defun ir-start-session ()
