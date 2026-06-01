@@ -33,6 +33,8 @@
 
 (declare-function org-roam-node-read "ext:org-roam")
 (declare-function org-roam-node-id "ext:org-roam")
+(declare-function org-roam-node-list "ext:org-roam")
+(defvar org-roam-directory)
 
 (defgroup ir nil
   "Settings for `ir.el'."
@@ -220,6 +222,27 @@ Postcondition: the node's id has exactly one queue row."
     (if (ir--enqueue id)
         (message "IR: queued node %s" id)
       (message "IR: node already queued"))))
+
+(defun ir-add-roam-directory ()
+  "Queue every Org-roam node for incremental reading.
+Precondition: `org-roam' is installed and `org-roam-directory' names a
+directory.
+Postcondition: every node in the Org-roam cache has a queue row; existing
+rows are left intact.  The cache reflects the last `org-roam-db-sync', so
+files not yet synced are not seen.
+Caller declines via `user-error' when unconfigured, or aborts at the prompt."
+  (interactive)
+  (require 'org-roam)
+  (unless (and (boundp 'org-roam-directory)
+               (stringp org-roam-directory)
+               (file-directory-p org-roam-directory))
+    (user-error "IR: no org-roam-directory configured"))
+  (when (yes-or-no-p (format "IR: queue all roam nodes under %s? " org-roam-directory))
+    (let ((added 0))
+      (dolist (node (org-roam-node-list))
+        (when (ir--enqueue (org-roam-node-id node))
+          (setq added (1+ added))))
+      (message "IR: queued %d new roam node(s)" added))))
 
 ;; --- Extraction: promote a region in place ----------------------------------
 
