@@ -34,6 +34,8 @@
 (declare-function org-roam-node-read "ext:org-roam")
 (declare-function org-roam-node-id "ext:org-roam")
 (declare-function org-roam-node-list "ext:org-roam")
+(declare-function org-roam-node-from-id "ext:org-roam")
+(declare-function org-roam-node-title "ext:org-roam")
 (defvar org-roam-directory)
 
 (defgroup ir nil
@@ -321,9 +323,8 @@ Postcondition: an item plist with due <= now, ordered by priority then due."
 Precondition: ITEM is an item plist.
 Loads `org-roam' when available so its `org-id-find' advice resolves roam-node
 ids from the roam database.
-Return `ok' on success, or `unresolved' when the id cannot be opened.  Never
-deletes: an open failure does not prove the heading is gone; the id may be
-unindexed -- sync with `org-roam-db-sync'."
+Return `ok' on success, or `unresolved' when the id cannot be opened; the caller
+decides whether to prune.  This function never deletes."
   (let ((id (plist-get item :id)))
     (condition-case nil
         (progn
@@ -333,17 +334,21 @@ unindexed -- sync with `org-roam-db-sync'."
           (widen)
           (org-narrow-to-subtree)
           'ok)
-      (error
-       (message "IR: cannot open %s (heading missing or id not indexed -- try M-x org-roam-db-sync)" id)
-       'unresolved))))
+      (error 'unresolved))))
 
 (defun ir--open-next ()
-  "Open the next due item; message when none is due or it cannot be opened."
+  "Open the next due item.
+When a due item's heading cannot be opened (e.g. the note was deleted), offer to
+delete its stale queue row and continue; declining stops the session."
   (let ((item (ir--query-due)))
-    (if (null item)
-        (message "IR: queue empty for today")
-      (when (eq (ir--reading-setup item) 'ok)
-        item))))
+    (cond
+     ((null item) (message "IR: queue empty for today"))
+     ((eq (ir--reading-setup item) 'ok) item)
+     ((yes-or-no-p (format "IR: cannot open %s -- delete its stale queue row? "
+                           (plist-get item :id)))
+      (ir--delete (plist-get item :id))
+      (ir--open-next))
+     (t (message "IR: stopped at unresolvable item %s" (plist-get item :id))))))
 
 ;;;###autoload
 (defun ir-start-session ()
@@ -401,11 +406,11 @@ available.  Precondition: ID resolves to an existing heading."
   (format-time-string "%F" n))
 
 (defun ir--id-title (id)
-  "Return the Org heading title for ID, or ID itself when unresolved."
-  (let ((marker (org-id-find id 'marker)))
-    (if marker
-        (org-with-point-at marker (org-get-heading t t t t))
-      id)))
+  "Return a display label for ID without visiting any file.
+Uses the Org-roam database title when available, otherwise ID itself."
+  (or (and (require 'org-roam nil t)
+           (ignore-errors (org-roam-node-title (org-roam-node-from-id id))))
+      id))
 
 (defun ir--read-id (prompt)
   "Read a queued item id via PROMPT, completing over \"title -- id\" labels."
@@ -466,7 +471,9 @@ plus that many days, and editing `due' sets the next date directly."
 (defun ir-open ()
   "Open a queued item chosen by title, narrowed for reading."
   (interactive)
-  (ir--reading-setup (ir--item (ir--read-id "Open item: "))))
+  (let ((id (ir--read-id "Open item: ")))
+    (unless (eq (ir--reading-setup (ir--item id)) 'ok)
+      (message "IR: cannot open %s (heading missing or id not indexed)" id))))
 
 ;;;###autoload
 (defun ir-find-item-at-point ()
