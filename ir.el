@@ -318,23 +318,32 @@ Postcondition: an item plist with due <= now, ordered by priority then due."
                 " FROM ir WHERE due <= ? ORDER BY priority ASC, due ASC LIMIT 1")
         (list (ir--now)))))
 
+(defun ir--narrow-to-item ()
+  "Reveal the item at point: its subtree for a heading, else the whole file.
+Precondition: called in an Org buffer at the item's location.
+Postcondition: a file-level node (point before the first heading) is shown
+widened; a heading is narrowed to its subtree."
+  (widen)
+  (unless (org-before-first-heading-p)
+    (org-narrow-to-subtree)))
+
 (defun ir--reading-setup (item)
   "Open ITEM's heading for review, narrowed and alone in the frame.
 Precondition: ITEM is an item plist.
 Loads `org-roam' when available so its `org-id-find' advice resolves roam-node
 ids from the roam database.
-Return `ok' on success, or `unresolved' when the id cannot be opened; the caller
-decides whether to prune.  This function never deletes."
-  (let ((id (plist-get item :id)))
-    (condition-case nil
-        (progn
-          (require 'org-roam nil t)
-          (delete-other-windows)
-          (org-id-open id nil)
-          (widen)
-          (org-narrow-to-subtree)
-          'ok)
-      (error 'unresolved))))
+Return `ok' after a successful open (subtree for a heading, whole file for a
+file-level node), else `unresolved' when `org-id-open' cannot resolve the id.
+Presentation never yields `unresolved'; this function never deletes."
+  (require 'org-roam nil t)
+  (if (condition-case nil
+          (progn (org-id-open (plist-get item :id) nil) t)
+        (error nil))
+      (progn
+        (delete-other-windows)
+        (ir--narrow-to-item)
+        'ok)
+    'unresolved))
 
 (defun ir--open-next ()
   "Open the next due item.
@@ -392,11 +401,11 @@ Precondition: point is within the heading of the item under review."
 (defun ir-navigate-to-heading (&optional id)
   "Jump to the Org heading for ID, widened then narrowed.
 ID defaults to the org-id at point; messages and does nothing when none is
-available.  Precondition: ID resolves to an existing heading."
+available.  Precondition: ID resolves to an existing heading or file node."
   (interactive)
   (let ((id (or id (ir--id-at-point))))
     (if id
-        (progn (org-id-open id nil) (widen) (org-narrow-to-subtree))
+        (progn (org-id-open id nil) (ir--narrow-to-item))
       (message "IR: no org-id at point"))))
 
 ;; --- View & maintenance -----------------------------------------------------
