@@ -35,12 +35,25 @@ application and is no longer part of this package.
 4. Repeat until you see "queue empty for today".
 5. =M-x ir-end-session= records the last item and ends the session (closing the session frame if =ir-session-in-new-frame= is set).
 
+During review, =M-x ir-done-and-delete= finishes with the current item: it
+deletes the note (a whole-file node to trash, or cuts a heading's subtree),
+records it in =ir-done-log-file=, and advances to the next item. =ir-read-next=
+and =ir-done-and-delete= act on the item the session opened, so they work even if
+point has moved to another buffer.
+
 If =ir-start-session= reports "cannot open ... id not indexed" for Org-roam
 nodes, sync the Org-roam database with =M-x org-roam-db-sync= so the ids
 resolve.
 
 * Development
 ** Changelog
+- 0.14.0
+  - Add =(ir-done-and-delete)=: complete the item under review -- trash its file or cut its subtree, log it to =ir-done-log-file=, and advance.
+  - Add =(ir-add-roam-directory)= to queue every Org-roam node at once.
+  - Track the reviewed item in =ir--current-id= so =(ir-read-next)= / =(ir-done-and-delete)= act on it regardless of point or buffer.
+  - Open file-level Org-roam nodes without a spurious "delete stale row?" prompt; guard =org-id-get= to Org buffers.
+  - Add =;;;###autoload= cookies to all interactive commands.
+  - Add =ir-delete-to-trash= and =ir-done-log-file=.
 - 0.13.0
   - Org-only: remove PDF, bibtex, web, and video support (PDF IR moved to a separate app).
   - Replace =emacsql= with native =sqlite.el=; add =last_reviewed=, rename =date= to =due=, drop =type=/=path=.

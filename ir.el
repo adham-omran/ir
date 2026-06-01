@@ -6,7 +6,7 @@
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
 ;; Modified: June 01, 2026
-;; Version: 0.13.0
+;; Version: 0.14.0
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "29.1") (org-roam "2.3"))
@@ -558,17 +558,20 @@ Postcondition: the heading's subtree is removed from the file (recoverable via
 
 ;;;###autoload
 (defun ir-done-and-delete ()
-  "Complete the queued item at point: remove it from disk and the queue.
-A file-level node deletes its file; a heading cuts its subtree (file kept).
-Logs the completion to `ir-done-log-file', then confirms -- disclosing other
-queued items in the file and incoming backlinks -- before deleting.
-Precondition: point is within a queued item in an Org buffer."
+  "Complete the item under review: delete it and its row, then advance.
+Acts on `ir--current-id' (the item under review); with no session, on the queued
+item at point.  A file-level node deletes its file; a heading cuts its subtree,
+keeping the file.  Logs to `ir-done-log-file' and confirms -- disclosing other
+queued items in the file and incoming backlinks -- before deleting.  When the
+deleted item was under review, opens the next due item.
+Precondition: a review item exists, or point is on a queued item."
   (interactive)
-  (unless (derived-mode-p 'org-mode)
-    (user-error "IR: ir-done-and-delete works only in Org buffers"))
-  (let ((id (ir--id-at-point)))
+  (let ((id (or ir--current-id (ir--id-at-point))))
     (unless (and id (ir--item id))
-      (user-error "IR: point is not on a queued item"))
+      (user-error "IR: no review item, and point is not on a queued item"))
+    (condition-case nil
+        (org-id-open id nil)
+      (error (user-error "IR: cannot open %s" id)))
     (let* ((file-level (org-before-first-heading-p))
            (title (if file-level
                       (ir--id-title id)
@@ -595,7 +598,9 @@ Precondition: point is within a queued item in an Org buffer."
         (ir--log-done id title)
         (if file-level
             (ir--done-delete-file id file siblings)
-          (ir--done-cut-subtree id))))))
+          (ir--done-cut-subtree id))
+        (when (equal id ir--current-id)
+          (ir--open-next))))))
 
 ;;;###autoload
 (defun ir-open ()

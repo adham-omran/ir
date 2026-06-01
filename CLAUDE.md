@@ -24,7 +24,7 @@ Emacs 30.2 is on PATH. There is no CI; verify with byte-compile, checkdoc, and h
 
 ```sh
 # Byte-compile — must be warning-free. Built-in deps only (org, org-id, sqlite,
-# cl-lib); org-roam is require'd lazily inside ir-add-roam-node, so -Q suffices.
+# cl-lib); org-roam is require'd lazily (roam commands + `ir--reading-setup`), so -Q suffices.
 emacs -Q --batch -L . -f batch-byte-compile ir.el && rm -f ir.elc
 
 # Docstring/style conventions:
@@ -74,8 +74,9 @@ time. A pre-0.13 database (has `type`, lacks `due`) is rebuilt by
 round((now − last_reviewed)/86400 × afactor))`, `afactor += ir-afactor-increment`,
 `due = now + interval days`. Selection (`ir--query-due`) is a **priority queue**:
 `WHERE due <= now ORDER BY priority ASC, due ASC LIMIT 1` (due-ness gates, lower
-priority % wins). `ir-read-next`/`ir-end-session` reschedule the *current* item
-then advance.
+priority % wins). The **item under review is `ir--current-id`** — session state
+set by `ir--open-next`, not point — so `ir-read-next`/`ir-end-session`/`ir-done-and-delete`
+act on the opened item regardless of point drift or which buffer is current.
 
 ### Extraction: promote in place (copy)
 
@@ -85,15 +86,31 @@ it. The parent text is retained; recursion falls out (extract from an extract).
 
 ### Reading & views
 
-`ir--reading-setup` is the single open path: `org-id-open` + widen + narrow (no
-type dispatch). Missing-heading orphans are reported and optionally deleted.
-`ir-view` renders a due-ordered Org table; `ir-edit`/`ir-delete`/`ir-open`
-complete over `"title — id"` labels resolved by `ir--id-title`.
+`ir--reading-setup` opens via `org-id-open`, then `ir--narrow-to-item`:
+`org-narrow-to-subtree` for a heading, or the **whole file** for a file-level node
+(`org-before-first-heading-p`). Only an `org-id-open` resolution failure returns
+`unresolved`; presentation errors (e.g. narrowing) never do. On `unresolved`,
+`ir--open-next` offers to prune the stale row — it never auto-deletes. `ir-view`
+renders a due-ordered Org table; `ir-edit`/`ir-delete`/`ir-open` complete over
+`"title — id"` labels from `ir--id-title`, which reads the **org-roam db** (or the
+id) and never visits files.
+
+### Completion: `ir-done-and-delete`
+
+Acts on `ir--current-id` (point only with no session), navigates to it, logs to
+`ir-done-log-file`, then deletes: a file-level node's file → trash
+(`ir-delete-to-trash`) plus its sibling queue rows and roam-db entry; a heading →
+`org-cut-subtree`. When the deleted item was under review it advances via
+`ir--open-next`. The confirm discloses sibling-row and backlink counts; foreign
+backlinks are left dangling (not repaired).
 
 ## Conventions & gotchas
 
 - **Naming:** `ir-*` = interactive commands; `ir--*` = private helpers; `defcustom ir-*` = settings.
 - **Dynamic-SQL safety:** SQLite parameterizes *values* only, not identifiers. `ir--update-column` whitelists the column against `ir--editable-columns` before interpolation — keep that guard for any caller-chosen column.
-- **org-roam is a soft dependency:** core runs on `org-id` (covers roam *and* plain Org files); org-roam is `require`d lazily, only in `ir-add-roam-node`.
+- **Review-item model:** `ir--current-id` (not point) is the item under review; session commands act on it. Point-based commands (`ir-add`, `ir-navigate-to-heading`, `ir-find-item-at-point`) use `ir--id-at-point`.
+- **`org-id-get` only in Org buffers:** Org 9.7+ routes it through `org-element-at-point`, which errors elsewhere; `ir--id-at-point` guards with `derived-mode-p`.
+- **Autoloads:** every interactive command carries `;;;###autoload`; `doom sync` regenerates `ir-autoloads.el` so `M-x` sees them without a config loader.
+- **org-roam is a soft dependency:** core runs on `org-id`; org-roam is `require`d lazily (roam importers, `ir--reading-setup`, `ir--id-title`) and its `org-id-find` advice resolves roam ids from the roam db.
 - **Datastore is user data, not repo data:** `~/org/ir.db` lives outside the repo and is configurable via `defcustom ir-db-location`.
 - **Extraction needs a file-visiting buffer** (org-id constraint) — relevant when writing tests.
