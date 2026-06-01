@@ -192,10 +192,16 @@ grows by `ir-afactor-increment'; due = now + interval days; last_reviewed
                  now
                  id)))))))
 
+(defun ir--id-at-point ()
+  "Return the org-id of the Org entry at point, or nil outside an Org buffer.
+Guards `org-id-get', which signals via `org-element-at-point' in non-Org
+buffers under Org 9.7+."
+  (and (derived-mode-p 'org-mode) (org-id-get)))
+
 (defun ir--reschedule-current ()
   "Reschedule the queued item under point.
 Caller bug (reported, not signalled) if point is not within a queued heading."
-  (let ((id (org-id-get)))
+  (let ((id (ir--id-at-point)))
     (if (and id (ir--item id))
         (ir--reschedule id)
       (message "IR: point is not on a queued item"))))
@@ -205,9 +211,12 @@ Caller bug (reported, not signalled) if point is not within a queued heading."
 ;;;###autoload
 (defun ir-add ()
   "Queue the Org heading at point for incremental reading.
-Precondition: point is within an Org heading.
-Postcondition: the heading has an org-id and exactly one queue row."
+Precondition: an Org buffer with point within a heading.
+Postcondition: the heading has an org-id and exactly one queue row.
+Declines via `user-error' outside an Org buffer."
   (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "IR: ir-add works only in Org buffers"))
   (let ((id (org-id-get-create)))
     (if (ir--enqueue id)
         (message "IR: queued %s" id)
@@ -376,11 +385,13 @@ Precondition: point is within the heading of the item under review."
 ;;;###autoload
 (defun ir-navigate-to-heading (&optional id)
   "Jump to the Org heading for ID, widened then narrowed.
-ID defaults to the org-id at point.  Precondition: ID resolves to a heading."
+ID defaults to the org-id at point; messages and does nothing when none is
+available.  Precondition: ID resolves to an existing heading."
   (interactive)
-  (org-id-open (or id (org-id-get)) nil)
-  (widen)
-  (org-narrow-to-subtree))
+  (let ((id (or id (ir--id-at-point))))
+    (if id
+        (progn (org-id-open id nil) (widen) (org-narrow-to-subtree))
+      (message "IR: no org-id at point"))))
 
 ;; --- View & maintenance -----------------------------------------------------
 
@@ -460,7 +471,7 @@ plus that many days, and editing `due' sets the next date directly."
 (defun ir-find-item-at-point ()
   "Echo the queue row for the org-id of the heading at point."
   (interactive)
-  (let ((id (org-id-get)))
+  (let ((id (ir--id-at-point)))
     (message "%S" (and id (ir--item id)))))
 
 (provide 'ir)
