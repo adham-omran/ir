@@ -12,18 +12,27 @@ maximizes the long-term recall.
 #+end_quote
 [[https://super-memory.com/help/read.htm#Introduction_to_incremental_reading][Introduction to Incremental Reading]]
 
-This project aims to cover all the useful features of incremental reading. The
-main features I have implemented so far are *scheduling of material* and
-*extraction from PDFs*.
+This project covers the useful features of incremental reading over *Org
+material only* — plain Org headings and Org-roam nodes. The main features are
+*scheduling of material* (a SuperMemo-style topic algorithm) and *in-place
+extraction* of fragments into scheduled child headings.
 
 The current way to create questions and clozes out of the extracts is to write
-them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
+them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]]. PDF incremental reading now lives in a separate
+application and is no longer part of this package.
 
 * Tutorial
 @TODO
 
 * Development
 ** Changelog
+- 0.13.0
+  - Org-only: remove PDF, bibtex, web, and video support (PDF IR moved to a separate app).
+  - Replace =emacsql= with native =sqlite.el=; add =last_reviewed=, rename =date= to =due=, drop =type=/=path=.
+  - SuperMemo-faithful scheduling: real elapsed interval × A-Factor; priority-queue selection.
+  - =(ir-extract-region)= promotes the region into a scheduled child heading in place.
+  - New =(ir-add)= (heading at point) and =(ir-add-roam-node)=; add =(ir-validate)=.
+  - Add =ir-afactor-increment=; remove =ir-extracts-file=, =ir-return-to-pdf=, =ir-add-only=.
 - 0.12.0: Add generic =(ir-view)=.
 - 0.11.1: Enhance =(ir-view-items-by-date)=.
 - 0.11.0: Add =ir-add-only= option.
@@ -47,12 +56,6 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 - 0.2.0: Add basic persistent highlighting functions.
 - 0.1.0: Initial release with basic extraction functions.
 ** What's Next?
-- [ ] Add table view for one type.
-
-  Similar mechanic to =(ir-add)= where =(ir-view)= shows a menu {=by-date=, =by-type=}.
-- [ ] =(ir-validate)=
-
-  Check every =id= in the database and whether or not its heading exists.
 - [ ] =(ir-reset)=
 
   Reset all items to default values.
@@ -61,18 +64,7 @@ them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
   Delete the entry and its header.
   - [ ] How to handle children?
 ** Possible Features
-- [ ] Research the possibility of sioyek integration
-
-  [[https://github.com/ahrm/sioyek/releases/tag/v1.4.0][Release 1.4.0]] of sioyek adds the ability to control a running instance of
-  sioyek with the command line.
-
 - [ ] Batch import.
-
-- [ ] Extracts from the browser.
-
-  Functions collect text from the web. Possiblities include =org-protocol=.
-  Possible APIs are =(ir-collect-from-web-selection)= and
-  =(ir-collect-from-clipboard)=.
 ** Implementation of question creation
 I see no reason to implement a way to create basic or cloze questions. This is
 not SuperMemo and I've already worked out a way to create basic and cloze cards
@@ -82,44 +74,33 @@ Since you are not supposed to manually open material. (ir-open) assumes you want
 to take notes on a specific piece of material. So it sets up the frame for that.
 My suggestion is to start a session then use (ir-open) then end the session when
 done with the manual study.
-** Adding a type
-1. Choose an appropriate name for the =type= column.
-1. Create a =(when)= to =(ir--reading-setup)=
-2. Create =(ir-add-<format>)=.
 * Design of the Database
-Using ~emacsql~ I created the following table.
+Using the built-in ~sqlite.el~ the schema is:
 
-| Column   | Affinity | Description                  |
-|----------+----------+------------------------------|
-| id       | TEXT     | Unique ID using ~org-id~       |
-| afactor  | REAL     | [[https://super-memory.com/help/g.htm#A-Factor][A-Factor]]                     |
-| priority | REAL     | [[https://super-memory.com/help/g.htm#Priority][Priority]]                     |
-| interval | INTEGER  | [[https://super-memory.com/help/g.htm#Interval][Interval]]                     |
-| date     | INTEGER  | Date of next repetition      |
-| type     | TEXT     | Type of file (web, pdf, txt) |
-| path     | TEXT     | Path to file if applicalble  |
+| Column        | Affinity | Description                                  |
+|---------------+----------+----------------------------------------------|
+| id            | TEXT     | Unique ID using ~org-id~ (primary key)         |
+| afactor       | REAL     | [[https://super-memory.com/help/g.htm#A-Factor][A-Factor]], default 1.2                       |
+| interval      | INTEGER  | [[https://super-memory.com/help/g.htm#Interval][Interval]] in days (informational)            |
+| priority      | REAL     | [[https://super-memory.com/help/g.htm#Priority][Priority]]; 0 = most important … 100 = least |
+| due           | INTEGER  | Unix time of next repetition                 |
+| last_reviewed | INTEGER  | Unix time of last review                     |
 
-One of my goals is to support as many possible file types as possible. This
-would allow one to incrementally learn any piece of material. This also allows
-others to easily extend the program by including their favorite file types and
-programs to open them.
-
-One way to query the database is to sort the ~ir~ table by date, then match the
-file type to a function that opens that file type.
-
-Such files have a path which is inserted in the path column.
-
-Example
-| File type | Method              | Description.          |
-|-----------+---------------------+-----------------------|
-| text      | org-id-find         | A simple org heading. |
-| pdf       | dired-find-file     | A pdf file.           |
-| mp4       | async-shell-command | A video file.         |
+Every item is an Org heading addressed by its ~org-id~; there is no file-type
+column. Content lives in your Org files (plain or Org-roam) and the database
+holds only the schedule.
 ** Algorithm Design
 
-I use a simplified SM2 algorithm to calculate the intervals. The A Factor
-increases by 0.08 per repetition.
+Scheduling follows SuperMemo's topic model. On review the next interval is the
+*real elapsed interval* (time since the last review) multiplied by the A-Factor,
+measured from the review day:
 
-$\text{New Interval} = \text{round}(\text{Old Interval} \times \text{A Factor})$
+$\text{Elapsed} = \text{round}((\text{now} - \text{LastReviewed}) / 86400)$
 
-$\text{New Date} = \text{Old Date} + \text{New Interval}$
+$\text{Interval} = \max(1, \text{round}(\text{Elapsed} \times \text{AFactor}))$
+
+$\text{Due} = \text{now} + \text{Interval}$
+
+The A-Factor grows by =ir-afactor-increment= (default 0.015) per review. The
+review queue is a priority queue: only items with $\text{Due} \le \text{now}$
+are eligible, ordered by priority (0% first).

@@ -5,31 +5,34 @@
 ;; Author: Adham Omran <adham.rasoul@gmail.com>
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
-;; Modified: August 18, 2022
-;; Version: 0.12.0
+;; Modified: June 01, 2026
+;; Version: 0.13.0
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
-;; Package-Requires: ((emacs "24.4"))
+;; Package-Requires: ((emacs "29.1") (org-roam "2.3"))
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
 ;;; Commentary:
-;; This package provides the features of Incremental Reading inside the Emacs
-;; ecosystem.  Enabling one to process thousands of articles and books.
+;; Incremental Reading over Org material.  Items are Org headings (plain Org or
+;; Org-roam nodes), keyed by `org-id'.  A SQLite database (native `sqlite.el')
+;; holds only the schedule; the content lives in your Org files.
 ;;
+;; Reviewing follows a simplified SuperMemo topic algorithm: the next interval is
+;; the real elapsed interval times an A-Factor, and the queue is a priority queue
+;; (due-ness gates eligibility, priority orders within it).
+;;
+;; Extraction promotes the selected region into a scheduled child heading in
+;; place (a copy; the parent text is retained).
 ;;
 ;;; Code:
-(require 'pdf-tools)
-(require 'pdf-annot)
-(require 'emacsql-sqlite)
 (require 'org)
 (require 'org-id)
-(require 's)
-(require 'citar)
-(require 'org-roam)
+(require 'sqlite)
+(require 'cl-lib)
 
-;; Load
-(load "~/Dropbox/code/projects/ir/ir-helper.el")
+(declare-function org-roam-node-read "ext:org-roam")
+(declare-function org-roam-node-id "ext:org-roam")
 
 (defgroup ir nil
   "Settings for `ir.el'."
@@ -37,603 +40,391 @@
   :group 'convenience)
 
 (defcustom ir-db-location "~/org/ir.db"
-  "Location of the database."
-  :type '(string))
-
-(defcustom ir-extracts-file "~/org/ir.org"
-  "Location of the extracts."
-  :type '(string))
-
-(defcustom ir-return-to-pdf t
-  "If t return to the PDF after extracting."
-  :type '(boolean))
+  "Location of the schedule database."
+  :type 'string)
 
 (defcustom ir-session-in-new-frame nil
-  "If t sessions start in a new frame."
-  :type '(boolean))
+  "If non-nil, `ir-start-session' opens a dedicated fullscreen frame."
+  :type 'boolean)
 
-(defcustom ir-add-only t
-  "If t `(ir-add)' will not open the material after adding it."
-  :type '(boolean))
+(defcustom ir-afactor-increment 0.015
+  "Amount the A-Factor grows on each review.
+Higher values make review intervals lengthen faster."
+  :type 'number)
 
-(defvar ir--list-of-unique-types '()
-  "List of unique values. Used for selecting a view.")
+;; --- Datastore (native sqlite.el) -------------------------------------------
 
-(defvar ir--p-column-names '(id 0 afactor 1 interval 2 priority 3 date 4
-                                type 5 path 6))
+(defconst ir--columns "id, afactor, interval, priority, due, last_reviewed"
+  "Selected columns of the `ir' table, in schema order.
+The order MUST match `ir--row->item'.")
 
-(defvar ir--video-formats '("webm" "mp4"))
+(defconst ir--schema
+  "CREATE TABLE ir (\
+ id TEXT PRIMARY KEY,\
+ afactor REAL NOT NULL DEFAULT 1.2,\
+ interval INTEGER NOT NULL DEFAULT 1,\
+ priority REAL NOT NULL DEFAULT 50.0,\
+ due INTEGER NOT NULL,\
+ last_reviewed INTEGER NOT NULL)"
+  "DDL for the v0.13 `ir' table.")
 
-;; Database creation
-(defvar ir-db (emacsql-sqlite ir-db-location))
+(defvar ir--db nil
+  "Memoized SQLite connection, or nil until first use.")
 
+(defun ir--now ()
+  "Return the current time as integer Unix seconds."
+  (round (float-time)))
 
-(emacsql ir-db [:create-table :if-not-exists ir
-                ([(id text :primary-key)
-                  (afactor real :default 1.2)
-                  (interval integer :default 1)
-                  (priority real :default 50.0)
-                  (date integer)
-                  (type text :not-null)
-                  (path text)
-                  ])])
+(defun ir--table-columns (db table)
+  "Return TABLE's column-name symbols in DB, or nil when TABLE is absent."
+  (mapcar (lambda (row) (intern (nth 1 row)))
+          (sqlite-select db (format "PRAGMA table_info(%s)" table))))
 
-(defun ir--create-heading ()
-  "Create heading with an org-id."
-  (org-open-file ir-extracts-file)
-  (widen)
-  (goto-char (point-max))
-  (insert "\n") ; For safety
-  (insert "* ")
-  (insert (format "%s" (current-time)) "\n")
-  (org-id-get-create)
-  (org-narrow-to-subtree))
+(defun ir--ensure-schema (db)
+  "Create the `ir' table in DB, or migrate a legacy one.
+Invariant: on return, table `ir' has the v0.13 columns."
+  (let ((cols (ir--table-columns db "ir")))
+    (cond ((null cols) (sqlite-execute db ir--schema))
+          ((or (memq 'type cols) (not (memq 'due cols)))
+           (ir--migrate-from-old db)))))
 
-(defun ir--create-subheading ()
-  "Create subheading with an org-id."
-  (org-open-file ir-extracts-file)
-  (org-insert-subheading 1)
-  (insert (format "%s" (current-time)) "\n")
-  (org-id-get-create)
-  (org-narrow-to-subtree))
+(defun ir--migrate-from-old (db)
+  "Rebuild the legacy {…,date,type,path} table in DB into the v0.13 schema.
+Precondition: table `ir' exists with a `date' column.
+Postcondition: table `ir' has the v0.13 columns, rows preserved, and
+`last_reviewed' reconstructed as date minus interval days; a .bak is written."
+  (copy-file (expand-file-name ir-db-location)
+             (concat (expand-file-name ir-db-location) ".bak") t)
+  (with-sqlite-transaction db
+    (sqlite-execute db "ALTER TABLE ir RENAME TO ir_old")
+    (sqlite-execute db ir--schema)
+    (sqlite-execute db
+                    "INSERT INTO ir (id, afactor, interval, priority, due, last_reviewed)\
+ SELECT id, afactor, interval, priority, date, MAX(0, date - interval * 86400)\
+ FROM ir_old")
+    (sqlite-execute db "DROP TABLE ir_old")))
 
-(defun ir--check-duplicate (column value)
-  "Check in COLUMN for VALUE."
-  (emacsql ir-db
-           [:select *
-            :from ir
-            :where (= $i1 $s2)]
-           column
-           value))
+(defun ir--db ()
+  "Return the live SQLite connection, opening and initializing it on first use.
+Postcondition: a connection whose `ir' table matches the v0.13 schema."
+  (or ir--db
+      (setq ir--db
+            (let ((db (sqlite-open (expand-file-name ir-db-location))))
+              (ir--ensure-schema db)
+              db))))
 
-                                        ; Import Functions
-(defun ir-add (choice)
-  "Add material of CHOICE type."
-  (interactive (list (completing-read "Material type: " '("bibtex entry"
-                                                          "pdf"
-                                                          "web"
-                                                          "video"
-                                                          "org-roam/current"
-                                                          "org-roam/find"))))
-  (cond ((equal choice "pdf") (ir-add-pdf))
-        ((equal choice "web") (ir-add-web-url))
-        ((equal choice "video") (ir-add-video))
-        ((equal choice "video") (ir-add-video))
-        ((equal choice "org-roam/current") (ir-add-current-roam-node))
-        ((equal choice "org-roam/find") (ir-add-roam-node-by-find))
-        ((equal choice "bibtex entry") (ir-add-bibtex-entry))
-        (t (message "Invalid. Try again."))))
-                                        ; PDF
-(defun ir-add-pdf ()
-  "Select and add a PDF file to the database."
-  (let ((path (read-file-name "Select PDF to add: " nil nil t)))
-    (if (equal (file-name-extension path) "pdf")
-        (if (ir--check-duplicate 'path (expand-file-name path))
-            (message "%s.pdf is already in the database." (file-name-base path))
-          (progn
-            (ir--create-heading)
-            (ir--insert-item (org-id-get) "pdf" (expand-file-name path))
-            (previous-buffer)
-            (message "Added %s successfully!" path)
-            (unless ir-add-only
-              (ir--reading-setup (ir--query-by-column (expand-file-name path) 'path t)))))
-      (message "File %s is not a PDF file." path))))
+(defun ir--row->item (row)
+  "Decode a SELECT ROW (columns in `ir--columns' order) into a plist.
+Precondition: ROW has six fields in schema order."
+  (cl-loop for key in '(:id :afactor :interval :priority :due :last_reviewed)
+           for val in row
+           append (list key val)))
 
-                                        ; Web
-(defun ir-add-web-url ()
-  "Add URL of a web article to the database."
-  (let ((url (read-string "URL: ")))
-    (ir--create-heading)
-    (ir--insert-item (org-id-get) "web" url)
-    (previous-buffer)
-    (unless ir-add-only
-      (ir--reading-setup (ir--query-by-column url 'path t)))))
+(defun ir--select (sql &optional values)
+  "Run SELECT SQL with VALUES, returning a list of item plists."
+  (mapcar #'ir--row->item (sqlite-select (ir--db) sql values)))
 
-                                        ; Bibtex
+(defun ir--all-ids ()
+  "Return the org-ids of every queued item, ordered by due date."
+  (mapcar (lambda (it) (plist-get it :id))
+          (ir--select (concat "SELECT " ir--columns " FROM ir ORDER BY due ASC"))))
 
-(defun ir-add-bibtex-entry ()
-  "Select an entry from bibliography, if there's a file, insert into db."
-  (let ((ref (citar-select-ref)))
-    (cond ((equal (citar-get-value 'file ref) nil) (message "No file."))
-          ((ir--check-duplicate 'path (citar-get-value 'file ref))
-           (message "%s.pdf already exists." (file-name-base (citar-get-value 'file ref))))
-          (ref
-           (progn
-             (ir--create-heading)
-             (ir--insert-item (org-id-get) "pdf" (citar-get-value 'file ref))
-             (previous-buffer)
-             (message "Added \"%s.pdf\" successfully." (file-name-base (citar-get-value 'file ref)))
-             (unless ir-add-only ;; TODO TEST
-               (ir--reading-setup (ir--query-by-column (citar-get-value 'file ref)) 'path)))))))
+(defun ir--item (id)
+  "Return the item plist for org-id ID, or nil when ID is not queued."
+  (car (ir--select (concat "SELECT " ir--columns " FROM ir WHERE id = ?")
+                   (list id))))
 
-                                        ; org-roam
-(defun ir-add-current-roam-node ()
-  "Add the currently visited roam node."
-  (ir--insert-item (org-id-get) "text"))
+(defun ir--enqueue (id)
+  "Insert org-id ID as a new item with the default schedule.
+Precondition: ID is a non-empty org-id string.
+Postcondition: exactly one row for ID exists.
+Return t when inserted, nil when ID was already queued."
+  (unless (ir--item id)
+    (let ((now (ir--now)))
+      (sqlite-execute (ir--db)
+                      "INSERT INTO ir (id, due, last_reviewed) VALUES (?, ?, ?)"
+                      (list id now now))
+      t)))
 
-(cl-defun ir-add-roam-node-by-find (&optional initial-input filter-fn pred)
-  "Find and open an Org-roam node by its title or alias. Then add it.
+(defun ir--delete (id)
+  "Delete the queue row for ID.
+Postcondition: no row with ID remains; the Org heading is untouched."
+  (sqlite-execute (ir--db) "DELETE FROM ir WHERE id = ?" (list id)))
 
-No clue what INITIAL-INPUT, FILTER-FN or PRED do."
-  ;; (interactive current-prefix-arg)
-  (let ((node (org-roam-node-read initial-input filter-fn pred)))
-    (cond ((ir--check-duplicate 'id (org-roam-node-id node)) (message "Node already exists."))
-          (t (ir--insert-item (org-roam-node-id node) "txt")))))  ;; TODO Add ir-add-only
+(defconst ir--editable-columns '("afactor" "interval" "priority" "due")
+  "Columns `ir-edit' may modify; the whitelist guarding interpolated SQL.")
 
-                                        ; video
-(defun ir-add-video ()
-  "Select and add a PATH video file to the database."
-  (let ((path (read-file-name "Select video to add: " nil nil t)))
-    (if (member (file-name-extension path) ir--video-formats)
-        (if (ir--check-duplicate 'path (expand-file-name path))
-            (message "%s is already in the database." (file-name-base path))
-          (progn
-            (ir--create-heading)
-            (ir--insert-item (org-id-get) "vid" (expand-file-name path))
-            (message "Added %s.%s successfully." (file-name-base path) (file-name-extension path))
-            (unless ir-add-only
-              (ir--reading-setup (ir--query-by-column (expand-file-name path) 'path t)))))
-      (message "File %s is not a video file. %s is not supported." path (file-name-extension path)))))
+(defun ir--update-column (id column value)
+  "Set whitelisted COLUMN of item ID to VALUE.
+Precondition: COLUMN is in `ir--editable-columns'; identifiers cannot be
+parameterized in SQL, so an unlisted COLUMN is a caller bug and is refused."
+  (unless (member column ir--editable-columns)
+    (error "Refusing to update non-whitelisted column %s" column))
+  (sqlite-execute (ir--db)
+                  (format "UPDATE ir SET %s = ? WHERE id = ?" column)
+                  (list value id)))
 
-                                        ; Database Functions
-;; TODO Remove if no longer in use.
-;; (defun ir--open-item (list)
-;;   "Opens an item given a LIST. Usually from a query."
-;;   (let ((item-id (nth 0 list))
-;;         (item-type (nth 5 list))
-;;         (item-path (nth 6 list)))
-;;     ;; Body
-;;     (when (equal item-type "text")
-;;       (ir-navigate-to-heading item-id))
-;;     (when (equal item-type "pdf")
-;;       (find-file item-path))
-;;     (when (equal item-type "web")
-;;       (browse-url item-path)
-;;       (ir-navigate-to-heading item-id)
-;;       (message "Open URL complete."))
-;;     (when (member item-type ir--video-formats)
-;;       (async-shell-command (concat "vlc '" item-path "'") nil nil))))
+;; --- Scheduling algorithm (faithful SuperMemo topic) ------------------------
 
+(defun ir--reschedule (id)
+  "Advance ID's schedule by the real-elapsed-interval topic formula.
+Precondition: ID is queued.
+Postcondition: interval = max(1, round(elapsed-days * afactor)); afactor
+grows by `ir-afactor-increment'; due = now + interval days; last_reviewed
+= now."
+  (let ((item (ir--item id)))
+    (if (not item)
+        (message "IR: %s is not in the queue" id)
+      (let* ((now (ir--now))
+             (afactor (plist-get item :afactor))
+             (elapsed-days (max 1 (round (/ (- now (plist-get item :last_reviewed))
+                                            86400.0))))
+             (interval (max 1 (round (* elapsed-days afactor)))))
+        (with-sqlite-transaction (ir--db)
+          (sqlite-execute
+           (ir--db)
+           "UPDATE ir SET interval = ?, afactor = ?, due = ?, last_reviewed = ? WHERE id = ?"
+           (list interval
+                 (+ afactor ir-afactor-increment)
+                 (+ now (* interval 86400))
+                 now
+                 id)))))))
 
-(defun ir--query-closest-time ()
-  "Query `ir-db' for the most due item.
+(defun ir--reschedule-current ()
+  "Reschedule the queued item under point.
+Caller bug (reported, not signalled) if point is not within a queued heading."
+  (let ((id (org-id-get)))
+    (if (and id (ir--item id))
+        (ir--reschedule id)
+      (message "IR: point is not on a queued item"))))
 
-The order is first by time from smallest number (closest date) to
-largest number (farthest date)."
-  ;; TODO Enable sorting by priority.
-  (nth 0 (emacsql ir-db
-                  [:select *
-                   :from ir
-                   :order-by date])))
+;; --- Import: register an existing org-id ------------------------------------
 
-(defun ir--query-by-column (value column &optional return-item)
-  "Search for VALUE in COLUMN.
+(defun ir-add ()
+  "Queue the Org heading at point for incremental reading.
+Precondition: point is within an Org heading.
+Postcondition: the heading has an org-id and exactly one queue row."
+  (interactive)
+  (let ((id (org-id-get-create)))
+    (if (ir--enqueue id)
+        (message "IR: queued %s" id)
+      (message "IR: already queued"))))
 
-If RETURN-ITEM is non-nil, returns the first result. I have this
-to avoid writing (nth 0) in all return functions that want a
-single item to return the value of a column from."
-  (if return-item
-      (progn
-        (nth 0 (emacsql ir-db
-                        [:select *
-                         :from ir
-                         :where (= $s1 $i2)]
-                        value
-                        column)))
-    (progn
-      (emacsql ir-db
-               [:select *
-                :from ir
-                :where (= $s1 $i2)]
-               value
-               column))))
+(defun ir-add-roam-node ()
+  "Queue an Org-roam node selected by completion.
+Precondition: `org-roam' is installed.
+Postcondition: the node's id has exactly one queue row."
+  (interactive)
+  (require 'org-roam)
+  (let ((id (org-roam-node-id (org-roam-node-read))))
+    (if (ir--enqueue id)
+        (message "IR: queued node %s" id)
+      (message "IR: node already queued"))))
 
-(defun ir--return-column (column query)
-  "Using a plist, access any value from a QUERY search in COLUMN.
-Prime use case it to get the id of a particular query. Note this
-only access the first result."
-  (nth (plist-get ir--p-column-names column) query))
+;; --- Extraction: promote a region in place ----------------------------------
 
-(defun ir--insert-item (id type &optional path)
-  "Insert item into `ir' database with TYPE and ID."
-  (unless path (setq path nil)) ;; Check if a path has been supplied.
-  (emacsql ir-db [:insert :into ir [id date type path]
-                  :values (
-                           [$s1 $s2 $s3 $s4])]
-           id
-           (round (float-time))
-           type
-           path))
+(defun ir--extract-title (text)
+  "Return a heading title from TEXT: its first non-blank line, at most 60 columns."
+  (let ((line (car (split-string (string-trim text) "\n" t))))
+    (truncate-string-to-width (or line "Extract") 60)))
 
-(defun ir--update-value (id column value)
-  "Update the VALUE for the item ID with at COLUMN."
-  (emacsql ir-db [:update ir
-                  :set $r3 := $v1
-                  :where (= $v2 id)]
-           (list (vector value))
-           (list (vector id))
-           column))
+(defun ir--extract-make-child (text)
+  "Append a child heading containing TEXT to the heading at point.
+Precondition: point is within an Org heading.
+Postcondition: a new last child of that heading exists with an org-id and
+TEXT as its body; return the child's org-id."
+  (org-back-to-heading t)
+  (let ((child-stars (make-string (1+ (org-current-level)) ?*))
+        (title (ir--extract-title text)))
+    (org-end-of-subtree t)
+    (unless (bolp) (insert "\n"))
+    (insert child-stars " " title "\n")
+    (forward-line -1)
+    (org-id-get-create)
+    (org-end-of-meta-data t)
+    (insert text "\n")
+    (org-back-to-heading t)
+    (org-id-get)))
 
-;; (defun ir-reset ()
-;; "Reset all items in the database to defalut values."
-;; (emacsql ir-db [
-;; :update ir
-;; :set 'afactor := 1.2
-;; :set 'priority := 50
-;; ]))
-
-
-                                        ; Algorithm Functions
-(defun ir--compute-new-interval ()
-  "Compute a new interval for the item of ID.
-Part of the ir-read function."
-  ;; The way I have it compute new interval for a PDF file is as follows.
-  ;;
-  ;; Navigate to the header of the PDF file. Use its ID to update the PDF's
-  ;; interval. This makes sense because the PDF is just another ID in the db.
-  (if (equal (file-name-extension (buffer-file-name)) "pdf")
-      (ir-navigate-to-heading))
-  (let (
-        (item (ir--query-by-column (org-id-get) 'id t)))
-    (let (
-          (old-a (ir--return-column 'afactor item))
-          (old-interval (ir--return-column 'interval item))
-          (old-date (ir--return-column 'date item)))
-      (ir--update-value (org-id-get) "interval" (round (* old-interval old-a)))
-      (ir--update-value (org-id-get) "afactor" (+ old-a 0.015))
-      (ir--update-value (org-id-get) "date" (+ old-date (* 24 60 60 old-interval))))))
-
-                                        ; Extract Functions
-                                        ; From org
-
-;; This works by taking the portion in the region and creating a new org-id
-;; heading.
-;;
-;;; Cases
-;; 1. We're in the `ir-extracts-file' file which implies the new extracts is a
-;; child of the current extract.
-;;
-;; 2. We're not in the `ir-extracts-file'. I could use the same path mechanism I
-;; use for PDFs. Create a new org-id heading per file and move to it when
-;; creating an extract from the same file.
-;;
-;; Edge Cases to (2)
-;;
-;; 1. The user does not want to have extracts in another location.
-;;
-;; 2. The user is using org-roam.
-;;
-;; If the file is not a PDF. Clip the selection into the kill ring. Move into
-
-;; an org-id heading. Create a subheading and paste.
 (defun ir-extract-region ()
-  "Extract from the current active region into appropriate org-id heading."
+  "Extract the active region into a scheduled child heading, copied in place.
+Precondition: an Org buffer with an active region under a heading.
+Postcondition: a new child subheading holds a copy of the region, the
+parent text is unchanged, the child is queued, and point returns to the
+region start.
+Declines (no mutation) on a non-Org buffer, no region, or no enclosing
+heading."
   (interactive)
-  (when (equal (file-name-extension (buffer-file-name)) "pdf")
-    (ir--extract-pdf-tools)
-    (when ir-return-to-pdf (previous-buffer)))
-  (catch 'no-region
-    (unless (use-region-p)
-      (throw 'no-region
-             (message "No active region.")))
+  (unless (derived-mode-p 'org-mode)
+    (user-error "IR: extraction works only in Org buffers"))
+  (unless (use-region-p)
+    (user-error "IR: no active region to extract"))
+  (let ((start (region-beginning))
+        (text (buffer-substring-no-properties (region-beginning) (region-end))))
+    (save-excursion
+      (unless (ignore-errors (org-back-to-heading t) t)
+        (user-error "IR: place the region under a heading"))
+      (let ((id (ir--extract-make-child text)))
+        (ir--enqueue id)
+        (message "IR: extracted under %s" id)))
+    (goto-char start)
+    (deactivate-mark)))
 
-    (kill-ring-save (region-beginning) (region-end))
-    (deactivate-mark)
-    ;; Check if we're in `ir-extracts-file'.
-    (if (ir--extracts-location-p)
+;; --- Review session ---------------------------------------------------------
+
+(defun ir--query-due ()
+  "Return the most-due, highest-priority item, or nil when nothing is due.
+Postcondition: an item plist with due <= now, ordered by priority then due."
+  (car (ir--select
+        (concat "SELECT " ir--columns
+                " FROM ir WHERE due <= ? ORDER BY priority ASC, due ASC LIMIT 1")
+        (list (ir--now)))))
+
+(defun ir--reading-setup (item)
+  "Open ITEM's heading for review, narrowed and alone in the frame.
+Precondition: ITEM is an item plist.
+Return `ok' on success, `deleted' if a missing heading's orphan row was removed,
+`kept' if the orphan was left in place."
+  (let ((id (plist-get item :id)))
+    (condition-case nil
         (progn
-          (org-insert-subheading nil)
-          (insert (format "%s" (current-time)) "\n")
-          (org-id-get-create)
-          (yank)
-          (org-narrow-to-subtree))
-      (progn
-        (ir--create-heading)
-        (yank)))))
+          (delete-other-windows)
+          (org-id-open id nil)
+          (widen)
+          (org-narrow-to-subtree)
+          'ok)
+      (error
+       (if (yes-or-no-p (format "IR: no heading for %s -- delete orphan row? " id))
+           (progn (ir--delete id) 'deleted)
+         'kept)))))
 
-(defun ir--extracts-location-p ()
-  "Check if we're in the correct location. BUFFER."
-  (equal (buffer-file-name) ir-extracts-file))
-
-                                        ; From pdf-tools
-
-(defun ir--extract-pdf-tools ()
-  "Create an extract from selection."
-  (ir--pdf-view-copy)
-  (pdf-annot-add-highlight-markup-annotation (pdf-view-active-region) "sky blue")
-  ;; Move to the PDF file's heading
-  (ir-navigate-to-heading)
-  (ir--create-subheading)
-  (yank)
-  ;; Add extract to the database
-  (ir--insert-item (org-id-get) "text"))
-
-(defun ir--pdf-view-copy ()
-  "Copy the region to the `kill-ring'."
-  (pdf-view-assert-active-region)
-  (let* ((txt (pdf-view-active-region-text)))
-    (kill-new (mapconcat 'identity txt "\n"))))
-
-                                        ; Read Functions
-
-(defun ir-read-next ()
-  "Move to the next item in the queue, compute next interval."
-  (interactive)
-  (ir--reading-setup (ir--query-closest-time))
-  (ir--compute-new-interval))
+(defun ir--open-next ()
+  "Open the next due item, skipping deleted orphans; message when none is due."
+  (let ((item (ir--query-due)))
+    (if (null item)
+        (message "IR: queue empty for today")
+      (pcase (ir--reading-setup item)
+        ('ok item)
+        ('deleted (ir--open-next))
+        ('kept (message "IR: skipped orphan %s" (plist-get item :id)))))))
 
 (defun ir-start-session ()
-  "Start a session."
+  "Begin a review session at the most-due item.
+Postcondition: with `ir-session-in-new-frame', a fullscreen frame named
+\"ir-session\" is created first."
   (interactive)
   (when ir-session-in-new-frame
     (make-frame '((name . "ir-session")))
     (select-frame-by-name "ir-session")
     (toggle-frame-fullscreen))
-  (ir--reading-setup (ir--query-closest-time)))
+  (ir--open-next))
+
+(defun ir-read-next ()
+  "Reschedule the item under review, then open the next due one.
+Precondition: point is within the heading of the item under review."
+  (interactive)
+  (ir--reschedule-current)
+  (ir--open-next))
 
 (defun ir-end-session ()
-  "End a session."
+  "Reschedule the item under review and end the session."
   (interactive)
-  (ir--compute-new-interval)
+  (ir--reschedule-current)
   (when ir-session-in-new-frame
     (delete-frame)))
 
-(defun ir--reading-setup (list)
-  "Prepare the ideal environment given a LIST.
+(defun ir-validate ()
+  "Report queued ids whose Org heading no longer exists; mutate nothing."
+  (interactive)
+  (let ((orphans (cl-remove-if #'org-id-find-id-file (ir--all-ids))))
+    (message "IR: %d orphan(s)%s" (length orphans)
+             (if orphans (format ": %S" orphans) ""))))
 
-This will open the material."
-  (let ((item-id (nth 0 list))
-        (item-type (nth 5 list))
-        (item-path (nth 6 list)))
-    (message "%s" item-path)
-    ;; Body
-    (when (equal item-type "txt")
-      (delete-other-windows)
-      (widen)
-      (org-id-open item-id nil)
-      (condition-case nil
-          (org-narrow-to-subtree)
-        (error nil)))
-
-    (when (equal item-type "pdf")
-      (delete-other-windows)
-      (find-file item-path)
-      (split-window-horizontally)
-      (ir-navigate-to-heading))
-
-    (when (equal item-type "web")
-      ;; If the frame is full-screen, toggle it off.
-      (when (eq (frame-parameter nil 'fullscreen) 'fullboth)
-        (toggle-frame-fullscreen))
-      (delete-other-windows)
-      (widen)
-      (org-id-open item-id nil)
-      (org-narrow-to-subtree)
-      (browse-url item-path))
-
-    (when (equal item-type "vid")
-      (delete-other-windows)
-      (when (eq (frame-parameter nil 'fullscreen) 'fullboth)
-        (toggle-frame-fullscreen))
-      (widen)
-      (org-id-open item-id nil)
-      (org-narrow-to-subtree)
-      (async-shell-command (concat "vlc '" item-path "'") nil nil))))
-
-
-
-                                        ; Navigation Functions
-;; TODO Remove if no longer in use.
-;; (defun ir-navigate-to-source ()
-;;   "Navigate to the source of a heading if one exists."
-;;   (interactive)
-;;   ;; get the id, use that to get the type, use the path.
-;;   (ir--open-item (ir--query-by-column (org-id-get) 'id t)))
+;; --- Navigation -------------------------------------------------------------
 
 (defun ir-navigate-to-heading (&optional id)
-  "Navigate to the heading given ID."
+  "Jump to the Org heading for ID, widened then narrowed.
+ID defaults to the org-id at point.  Precondition: ID resolves to a heading."
   (interactive)
-  (if (equal (file-name-extension (buffer-file-name)) "pdf")
-      (progn
-        (setq id
-              (ir--return-column 'id ;; Uses the results of `'ir--query-by-column'
-                                 ;; to return only the 'id value
-                                 (ir--query-by-column ;; Results in an item of the form ("id"
-                                  ;; afactor ... path)
-                                  (format "%s" (buffer-file-name))
-                                  'path t)))))
-  (find-file (org-id-find-id-file id))
-  (widen) ;; In case of narrowing by previous functions.
-  (goto-char (cdr (org-id-find id)))
+  (org-id-open (or id (org-id-get)) nil)
+  (widen)
   (org-narrow-to-subtree))
 
-                                        ; Editing Functions
-(defun ir-edit-column ()
-  "Search for an item."
+;; --- View & maintenance -----------------------------------------------------
+
+(defun ir--format-time (n)
+  "Render integer Unix-seconds N as an ISO date string."
+  (format-time-string "%F" n))
+
+(defun ir--id-title (id)
+  "Return the Org heading title for ID, or ID itself when unresolved."
+  (let ((marker (org-id-find id 'marker)))
+    (if marker
+        (org-with-point-at marker (org-get-heading t t t t))
+      id)))
+
+(defun ir--read-id (prompt)
+  "Read a queued item id via PROMPT, completing over \"title -- id\" labels."
+  (let ((alist (mapcar (lambda (id) (cons (format "%s -- %s" (ir--id-title id) id) id))
+                       (ir--all-ids))))
+    (cdr (assoc (completing-read prompt alist nil t) alist))))
+
+(defun ir-view ()
+  "Show all queued items as an Org table ordered by due date."
   (interactive)
-  (let (
-        (lists (let (
-                     (column (completing-read "What column do you want to search: "
-                                              '("id" "afactor" "interval" "priority" "type" "path") nil t))
-                     (search-me (completing-read "What to search for: " nil)))
-                 ;; Body
-                 (emacsql ir-db [:select *
-                                 :from ir
-                                 :where $i1 :like $s2
-                                 ]
-                          (intern column) ;; Turns a string into a symbol
-                          (concat "%" search-me "%")))))
-    ;; Find file approach
-    (find-file (make-temp-file "ir-view" nil ".org"))
+  (let ((items (ir--select
+                (concat "SELECT " ir--columns " FROM ir ORDER BY due ASC"))))
+    (pop-to-buffer (get-buffer-create "*ir-view*"))
     (erase-buffer)
+    (org-mode)
+    (insert "| ID | AF | Interval | Priority | Due |\n|-\n")
+    (dolist (it items)
+      (insert (format "| %s | %.3f | %d | %.1f | %s |\n"
+                      (plist-get it :id)
+                      (plist-get it :afactor)
+                      (plist-get it :interval)
+                      (plist-get it :priority)
+                      (ir--format-time (plist-get it :due)))))
+    (goto-char (point-min))
+    (org-table-align)))
 
-    (ir--view-create-table lists)
-    ;; Update the value
-    (let ((result (completing-read "Which result: " lists))
-          (column-name (completing-read "What column do you want to edit? " '("id" "afactor" "interval" "date" "priority" "type" "path") nil t)))
-      (ir--update-value result
-                        column-name
-                        (cond ((member column-name '("id" "afactor" "interval" "priority")) (read-number "New value: "))
-                              ((member column-name '("date")) (string-to-number (format-time-string "%s" (org-read-date nil 'to-time nil "New date:  "))))
-                              (t (read-string "New value: ")))))))
-
-;; 1. Choose what column to search
-;; 2. Enter search query
-;; 3. Choose the column you want to edit
-;; 4. Enter new value
+(defun ir-edit ()
+  "Edit one scheduling column of a queued item chosen by completion.
+The id column is immutable; editing `interval' reschedules `due' to now
+plus that many days, and editing `due' sets the next date directly."
+  (interactive)
+  (let ((id (ir--read-id "Edit item: "))
+        (column (completing-read "Column: " ir--editable-columns nil t)))
+    (pcase column
+      ("due"
+       (ir--update-column id "due"
+                          (time-convert (org-read-date nil t nil "New due: ")
+                                        'integer)))
+      ("interval"
+       (let ((days (read-number "Interval (days): ")))
+         (ir--update-column id "interval" days)
+         (ir--update-column id "due" (+ (ir--now) (* days 86400)))))
+      ((or "afactor" "priority")
+       (ir--update-column id column (read-number (format "New %s: " column)))))
+    (message "IR: updated %s of %s" column id)))
 
 (defun ir-delete ()
-  "Delete an item from the database."
+  "Delete a queued item's row chosen by completion; leave its heading intact."
   (interactive)
-  (let (
-        (lists (let (
-                     (column (completing-read "What column do you want to search: "
-                                              '("id" "afactor" "interval" "priority" "type" "path") nil t))
-                     (search-me (completing-read "What to search for: " nil)))
-                 ;; Body
-                 (emacsql ir-db [:select *
-                                 :from ir
-                                 :where $i1 :like $s2
-                                 ]
-                          (intern column) ;; Turns a string into a symbol
-                          (concat "%" search-me "%")))))
-    ;; Find file approach
-    (find-file (make-temp-file "ir-view" nil ".org"))
-    (erase-buffer)
-
-    (ir--view-create-table lists)
-    ;; Update the value
-    (let ((delete-this-id (completing-read "Which result to delete?: " lists)))
-      (message "%s" delete-this-id)
-      (emacsql ir-db
-               [:delete :from ir
-                :where (= id $s1)]
-               delete-this-id))))
-
-
-                                        ; View & Open Functions
-(defun ir-view (choice)
-  "View of by CHOICE."
-  (interactive (list (completing-read "Material type: " '("by date"
-                                                          "by type"))))
-  (cond ((equal choice "by date") (ir-view-items-by-date))
-        ((equal choice "by type") (ir-view-items-by-type))))
-
-(defun ir-view-items-by-type ()
-  "View TODO."
-  (let ((lists (let ((column (completing-read "Type: " ir--list-of-unique-types nil t)))
-                 (emacsql ir-db [:select *
-                                 :from ir
-                                 :where type :like $s1
-                                 ]
-                          column))))
-
-    (find-file (make-temp-file "ir-view" nil ".org"))
-    (ir--view-create-table lists)
-    (goto-char (point-max))
-    (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")
-    (condition-case nil
-        (while (re-search-backward "/home/.*/")
-          (replace-match ""))
-      (error nil))))
-
-(defun ir-view-items-by-date ()
-  "View all items by their due date."
-  (let ((lists (emacsql ir-db [
-                               :select *
-                               :from ir
-                               :order-by date
-                               ])))
-    ;; Create a file
-    (find-file (make-temp-file "ir-view" nil ".org"))
-    (ir--view-create-table lists)
-    (goto-char (point-max))
-    (insert "#+tblfm: @<<$5..@$5='(ir--format-time (string-to-number $5))")
-    (while (re-search-backward "/home/.*/")
-      (replace-match ""))))
-
-(defun ir--format-time (N)
-  "Used in a table to convert the N dates into human-readable times."
-  (format-time-string "%F" N))
-
-(defun ir--view-create-table (lists)
-  "Transform a list of LISTS into a table."
-  (insert "\n")
-  (insert (format "%s" lists))
-  (goto-char (point-min))
-  (while (re-search-forward ") (" nil t)
-    (replace-match "\n|"))
-  (goto-char (point-min))
-  (while (re-search-forward " \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([0-9]*.[0-9]*\\) \\([a-z]*\\) " nil t)
-    (replace-match "|\\1|\\2|\\3|\\4|\\5|"))
-  (goto-char (point-max))
-  (backward-delete-char 2)
-  (goto-char (point-min))
-  (insert "|ID|AF|Interval|PR|DATE|TYPE|PATH\n")
-  (delete-char 3)
-  (insert "|")
-  (org-table-align)
-  (goto-char (point-min))
-  (org-table-insert-hline))
-
-(defun ir--list-type (&optional type)
-  "Return a list of items with a type. TYPE optional."
-  (if (eq type nil)
-      (progn
-        (let ((type (completing-read "Choose type: " ir--list-of-unique-types)))
-          (emacsql ir-db
-                   [:select *
-                    :from ir
-                    :where (= type $s1)]
-                   type)))
-    (progn
-      (emacsql ir-db
-               [:select *
-                :from ir
-                :where (= type $s1)]
-               type))))
-
-(defun ir--list-unique-types ()
-  "Return a list of every unique type."
-  (emacsql ir-db
-           [:select :distinct [type]
-            :from ir]))
-
-(setq ir--list-of-unique-types (ir--list-unique-types))
-
-(defun ir--list-paths-of-type (list)
-  "Return the nth element in a list of lists (LIST)."
-  (let (result)
-    (dolist (item list result)
-      (push (nth 6 item) result))))
+  (let ((id (ir--read-id "Delete item: ")))
+    (ir--delete id)
+    (message "IR: deleted %s" id)))
 
 (defun ir-open ()
-  "Doc. TODO."
+  "Open a queued item chosen by title, narrowed for reading."
   (interactive)
-  ;; Choose file format, choose path, find item of that path and return as list
-  ;; to reading-setup.
-  (let ((path (completing-read "Choose material: " (ir--list-paths-of-type (ir--list-type)))))
-    (ir--reading-setup (ir--query-by-column path 'path t))))
+  (ir--reading-setup (ir--item (ir--read-id "Open item: "))))
+
+(defun ir-find-item-at-point ()
+  "Echo the queue row for the org-id of the heading at point."
+  (interactive)
+  (let ((id (org-id-get)))
+    (message "%S" (and id (ir--item id)))))
 
 (provide 'ir)
 ;;; ir.el ends here

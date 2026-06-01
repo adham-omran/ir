@@ -1,0 +1,135 @@
+#+title: ir.el v0.13.0 — Org-only refactor plan
+#+date: 2026-06-01
+#+startup: content
+
+* Status
+Spec approved 2026-06-01. Ready to build.
+Produced through Research → Design → Spec. Obligation levels: MUST / SHOULD / MAY / WONT.
+
+* Goal
+Refactor ir.el to incremental-reading over org material only.
+- Remove PDF/bibtex/web/video (PDF IR moved to ~/code/electric-card-maker).
+- Replace emacsql (broken on installed v4.3.6) with native =sqlite.el=.
+- Fix architecture issues; remove hardcoded values; update deps.
+- Extraction = SuperMemo-style promote-in-place; scheduling = faithful SuperMemo topic algorithm.
+
+* Decisions locked
+| Fork           | Resolution                                                              |
+|----------------+-------------------------------------------------------------------------|
+| D-1 row repr   | plist (:id :afactor :interval :priority :due :last_reviewed)            |
+| D-2 extract    | copy — parent retains text                                              |
+| D-4 due formula| faithful — real elapsed interval; adds last_reviewed column             |
+| D-5 priority   | lower value = sooner                                                    |
+| D-9 selection  | priority queue — due gates eligibility, priority orders within it       |
+| D-3 title      | extract title = region's first line, ≤60 chars                          |
+| D-6 ir-open    | redefine to complete over item titles                                   |
+| D-7 no-heading | error; no top-level auto-create                                         |
+| version        | 0.13.0                                                                  |
+Adopted minors: drop =ir-extracts-file=; rename =date= → =due=; =0.015= → defcustom; rebuild-migrate db; keep+wire =priority=.
+
+* SuperMemo reference facts (drive §4 / §7)
+- F1 [confirmed] Topic next interval = =interval × A-Factor=. (super-memory.com/help/g.htm)
+- F2 [confirmed] Priority 0% = most important, 100% = least; lower = sooner. (g.htm; help.supermemo.org/wiki/Priority_queue)
+- F3 [confirmed items / probable topics] Delayed reps anchor on actual review day and multiply the REAL elapsed interval. (super-memory.com/archive/help16/faq/overload.htm)
+- F4 [confirmed] Topic order is a priority queue (due gates, priority orders, overflow auto-postpones). (super-memory.com/archive/help16/read.htm)
+
+* Findings that drove the refactor (confirmed in-session)
+- emacsql 4.3.6 removed the bare =emacsql-sqlite= constructor → ir.el:68 errors at load.
+- Native =sqlite.el= present in Emacs 30.2 (=sqlite-available-p= = t; =with-sqlite-transaction= exists).
+- Type-value bug: =ir-add-current-roam-node= writes "text"; reader matches only "txt".
+- Load-time side effects: db opened + table created + unique-types queried at require.
+- Positional column coupling via =(nth N)= + =ir--p-column-names=.
+- =ir-view-items-by-date= =/home/.*/= regex crashes on macOS (no condition-case).
+- Algorithm bug: due advanced by OLD interval while interval column stored the NEW value (ir.el:302-304).
+- Latent: duplicate "video" cond branch (120-121); =ir-add-bibtex-entry= misplaced paren (167).
+- =s= required but unused.
+
+* WBS
+
+** 1 Package & dependencies
+- [ ] 1.1 =MUST= Header =Version: 0.13.0=; =Package-Requires: ((emacs "29.1") (org-roam "2.3"))=. Verify: no missing-dep lint.
+- [ ] 1.2 =MUST= require: org, org-id, sqlite, cl-lib. Remove pdf-tools, pdf-annot, emacsql-sqlite, citar, s. Verify: grep =pdf\|emacsql\|citar\|(require 's)= = ∅.
+- [ ] 1.3 =SHOULD= Load org-roam lazily inside the roam-import command, not top-level. Verify: core runs with org-roam absent.
+
+** 2 Customization (defcustom)
+- [ ] 2.1 =MUST= Keep =ir-db-location=. Verify: rebinding before first use selects the opened file.
+- [ ] 2.2 =MUST= Keep =ir-session-in-new-frame=. Verify: when t, session opens frame "ir-session".
+- [ ] 2.3 =MUST= Add =ir-afactor-increment= (default 0.015). Verify: a review increases afactor by exactly this.
+- [ ] 2.4 =WONT= Remove =ir-extracts-file=, =ir-return-to-pdf=, =ir-add-only=. Verify: symbols undefined.
+
+** 3 Datastore layer (native sqlite.el)
+- [ ] 3.1 =MUST= Schema: =ir(id TEXT PRIMARY KEY, afactor REAL NOT NULL DEFAULT 1.2, interval INTEGER NOT NULL DEFAULT 1, priority REAL NOT NULL DEFAULT 50.0, due INTEGER NOT NULL, last_reviewed INTEGER NOT NULL)=. On enqueue =due = last_reviewed = now=. Verify: =table_info(ir)= = these 6; new row =due == last_reviewed=.
+- [ ] 3.2 =MUST= Lazy connection =ir--db=: open on first use, memoize, create table + migrate, NOT at load/require. Verify: =(require 'ir)= in =emacs -Q= does not create the db file; first command does.
+- [ ] 3.3 =MUST= Single decoder =ir--row->item= → plist; no =(nth N)= on rows. Verify: grep =(nth = over rows = ∅.
+- [ ] 3.4 =MUST= Write boundaries: =ir--enqueue(id)= (insert w/ SQL defaults, dup-safe) and =ir--reschedule(id)= (§4, one txn). Verify: import + extract both insert via enqueue; review updates via reschedule only.
+- [ ] 3.5 =MUST= Identifier safety: caller-chosen update columns (§9.3) whitelisted against schema before interpolation; values use =?= placeholders. Verify: editing column ="foo; DROP"= rejected, no SQL run.
+- [ ] 3.6 =SHOULD= Multi-statement writes in =with-sqlite-transaction=. Verify: a mid-update error leaves the row unchanged.
+
+** 4 Scheduling algorithm (faithful SuperMemo topic)
+- [ ] 4.1 =MUST= =ir--reschedule(id)= in one transaction:
+  - =elapsed = max(1, round((now − last_reviewed) / 86400))=
+  - =interval' = max(1, round(elapsed × afactor))=
+  - =afactor' = afactor + ir-afactor-increment=
+  - =due' = now + interval' × 86400=; =last_reviewed' = now=
+  Verify: afactor 2.0, last_reviewed 20d ago, reviewed today → interval'=40, due'≈now+40d, last_reviewed'=now.
+- [ ] 4.2 =SHOULD= =interval= is informational (not an algorithm input under D-4); it is the manual-reschedule knob. Editing =interval= ⇒ =due = now + interval × 86400=; editing =due= sets it directly. Verify: set interval=7 → due = now+7d.
+- Known properties (not bugs): early review (now<due) → smaller elapsed → smaller next interval; first review of an import treats import time as pseudo-last-review.
+- [ ] 4.3 =MAY= priority→first-interval (SuperMemo derives first interval from priority). Deferred.
+
+** 5 Import — register an existing org-id
+- [ ] 5.1 =MUST= =ir-add= registers org-id of heading/node at point (=org-id-get-create=) via =ir--enqueue=. Verify: point on heading → one row with that id.
+- [ ] 5.2 =MUST= Duplicate guard: re-register = no-op + message. Verify: run twice → exactly one row.
+- [ ] 5.3 =SHOULD= =ir-add-roam-node= reads via =org-roam-node-read=, registers =org-roam-node-id=. Verify: pick node → row with its id; org-roam absent → clean error.
+- [ ] 5.4 =MAY= Keep =ir-add= as a 2-choice dispatcher (at-point / roam-node). =MUST= remove the old pdf/web/video/bibtex menu.
+
+** 6 Extraction — ir-extract-region (promote in place)
+- [ ] 6.1 =MUST= Precondition: org-mode buffer + active region; non-org → error, no mutation. Verify: non-org buffer → message, nothing created.
+- [ ] 6.2 =MUST= Locate enclosing heading; none → error "place region under a heading" (D-7). Verify: region above first heading → message, nothing created.
+- [ ] 6.3 =MUST= Create child subheading under enclosing heading; assign org-id; region COPIED in (D-2), parent text retained. Verify: select region under H, extract → new child of H with org-id, identical text, parent unchanged.
+- [ ] 6.4 =MUST= Enqueue child id (defaults). Verify: exactly one new row, due=now.
+- [ ] 6.5 =SHOULD= Child title = region's first line ≤60 chars (D-3). Verify: title non-empty, ≤ limit.
+- [ ] 6.6 =SHOULD= Point returns to source location post-extraction. Verify: point = pre-command region start.
+- [ ] 6.7 =SHOULD= Recursive: extracting inside an extract creates a grandchild item. Verify: extract within extract → child-of-extract row exists.
+- [ ] 6.8 =WONT= PDF / region-highlight / =ir--extracts-location-p= two-location logic. Verify: symbols gone.
+
+** 7 Review session
+- [ ] 7.1 =MUST= =ir--query-due=: eligible =WHERE due <= now=; next = =ORDER BY priority ASC, due ASC LIMIT 1=; empty → message "IR queue empty for today", open nothing (D-9). Verify: two due items priority 10 vs 90 → priority-10 first; none due → message, no buffer change.
+- [ ] 7.2 =MUST= =ir--reading-setup(item)=: delete-other-windows, org-id-open, widen, narrow. Single path, no type dispatch. Verify: due item's heading shown narrowed, full-window.
+- [ ] 7.3 =MUST= Orphan handling: org-id-open failure → message + skip to next; =SHOULD= offer to delete the orphan row. Verify: delete a heading then run session over its id → no error, session proceeds.
+- [ ] 7.4 =MUST= =ir-start-session=, =ir-read-next= (reschedule current → open next), =ir-end-session= (reschedule current). Honor =ir-session-in-new-frame=. Verify: read-next advances just-seen item's due and shows next.
+- [ ] 7.5 =MAY= =ir-validate=: scan all ids, report orphans. Verify: returns set of orphan ids.
+- [ ] 7.6 =WONT= Auto-postpone / daily load caps. Verify: overflow not auto-pushed.
+
+** 8 Navigation
+- [ ] 8.1 =MUST= =ir-navigate-to-heading(&optional id)=: jump to id (or item at point), widen, narrow. Drop PDF-buffer special case. Verify: from any buffer, call with id → heading visible+narrowed; no PDF path.
+
+** 9 View & maintenance
+- [ ] 9.1 =MUST= =ir-view=: one due-ordered org table of {id, afactor, interval, priority, due}, due via =ir--format-time=. Remove =/home/.*/= regex and the by-date/by-type split. Verify: runs on macOS without error; rows sorted by due.
+- [ ] 9.2 =WONT= =ir-view-items-by-type=, =ir--list-unique-types=, =ir--list-of-unique-types=, =ir--list-type=. Verify: symbols gone.
+- [ ] 9.3 =SHOULD= =ir-edit=: editable columns {afactor, interval, priority, due} (not id); due via =org-read-date=; column whitelisted (§3.5); interval/due reschedule semantics (§4.2). Verify: edit interval → db + due reflect it; bogus column rejected.
+- [ ] 9.4 =SHOULD= =ir-delete=: search by {id, interval, priority, due}, delete row; default leaves heading; =MAY= offer to delete heading. Verify: delete → row gone, heading intact.
+- [ ] 9.5 =SHOULD= =ir-open= (D-6): complete over item titles (resolve id→heading title), open via =ir--reading-setup=. Verify: pick a title → its heading opens narrowed.
+
+** 10 Folded dev helper
+- [ ] 10.1 =SHOULD= Fold =ir-helper-find-item-from-id= → =ir-find-item-at-point= (echo db row for org-id at point). Verify: on a queued heading → echoes its row.
+- [ ] 10.2 =WONT= =ir-helper-select-all=, =ir-helper-drop-table=, file =ir-helper.el=. Verify: file deleted.
+
+** 11 Removals (delete entirely) =MUST=
+- [ ] 11.1 Files =ir-helper.el=, =ir-on-hold.el=; the =(load "~/Dropbox/...")= line. Verify: files gone, no absolute-path load.
+- [ ] 11.2 Functions: =ir-add-pdf=, =ir-add-bibtex-entry=, =ir-add-web-url=, =ir-add-video=, =ir-add-current-roam-node=, =ir-add-roam-node-by-find=, =ir--extract-pdf-tools=, =ir--pdf-view-copy=, dead =ir--open-item= / =ir-navigate-to-source=. Verify: symbols gone.
+- [ ] 11.3 Vars: =ir--video-formats=, =ir--p-column-names=. Verify: gone.
+- [ ] 11.4 Latent bugs dissolved by removal: duplicate "video" cond branch; =ir-add-bibtex-entry= misplaced-paren call. Verify: N/A after deletion.
+
+** 12 Migration of existing ir.db =MUST=
+- [ ] 12.1 =MUST= On connect, detect old schema (column =type= present OR =due= absent) → rebuild: new table, =INSERT … SELECT id, afactor, interval, priority, date= (date→due), set =last_reviewed = max(0, date − interval × 86400)=, drop old, rename. Verify: opening a pre-0.13 db yields the §3.1 schema; row count + ids unchanged; =due − last_reviewed == interval= days.
+- [ ] 12.2 =SHOULD= Copy db to =<file>.bak= before rebuild. Verify: .bak exists post-migration.
+
+** 13 Documentation =SHOULD=
+- [ ] 13.1 README: changelog 0.13.0; remove PDF/bibtex/video/highlight + "Adding a type"; fix A-factor 0.08 → 0.015/defcustom; schema table → 6 cols (drop type/path, date→due, +last_reviewed). Verify: no =pdf=/=bibtex=/=0.08= in README.
+- [ ] 13.2 CLAUDE.md: rewrite architecture (no type-dispatch, sqlite.el, promote-in-place extract, new deps/gotchas). Verify: no stale PDF/emacsql/type claims.
+
+** 14 Verification battery
+- [ ] 14.1 =MUST= Byte-compile clean with deps on load-path. Verify: =batch-byte-compile ir.el= no error/warning.
+- [ ] 14.2 =SHOULD= =checkdoc-file= clean. Verify: no complaints.
+- [ ] 14.3 =MUST= Manual smoke: import-at-point; extract-region; session advances due; ir-view renders; migrate a copied old db. Verify: each step's done-condition holds.
+- [ ] 14.4 =WONT= Automated ERT suite this iteration (no harness exists).
