@@ -212,13 +212,17 @@ Guards `org-id-get', which signals via `org-element-at-point' in non-Org
 buffers under Org 9.7+."
   (and (derived-mode-p 'org-mode) (org-id-get)))
 
+(defvar ir--current-id nil
+  "Org-id of the item currently under review, or nil between sessions.
+Set by `ir--open-next' when an item opens; read by `ir--reschedule-current' so a
+review is recorded for the opened item regardless of where point drifts.")
+
 (defun ir--reschedule-current ()
-  "Reschedule the queued item under point.
-Caller bug (reported, not signalled) if point is not within a queued heading."
-  (let ((id (ir--id-at-point)))
-    (if (and id (ir--item id))
-        (ir--reschedule id)
-      (message "IR: point is not on a queued item"))))
+  "Reschedule the item currently under review (`ir--current-id').
+No-op with a message when no item is under review."
+  (if (and ir--current-id (ir--item ir--current-id))
+      (ir--reschedule ir--current-id)
+    (message "IR: no item under review")))
 
 ;; --- Import: register an existing org-id ------------------------------------
 
@@ -358,18 +362,21 @@ Presentation never yields `unresolved'; this function never deletes."
     'unresolved))
 
 (defun ir--open-next ()
-  "Open the next due item.
+  "Open the next due item and record it as the item under review.
 When a due item's heading cannot be opened (e.g. the note was deleted), offer to
 delete its stale queue row and continue; declining stops the session."
   (let ((item (ir--query-due)))
     (cond
-     ((null item) (message "IR: queue empty for today"))
-     ((eq (ir--reading-setup item) 'ok) item)
+     ((null item) (setq ir--current-id nil) (message "IR: queue empty for today"))
+     ((eq (ir--reading-setup item) 'ok)
+      (setq ir--current-id (plist-get item :id))
+      item)
      ((yes-or-no-p (format "IR: cannot open %s -- delete its stale queue row? "
                            (plist-get item :id)))
       (ir--delete (plist-get item :id))
       (ir--open-next))
-     (t (message "IR: stopped at unresolvable item %s" (plist-get item :id))))))
+     (t (setq ir--current-id nil)
+        (message "IR: stopped at unresolvable item %s" (plist-get item :id))))))
 
 ;;;###autoload
 (defun ir-start-session ()
@@ -396,6 +403,7 @@ Precondition: point is within the heading of the item under review."
   "Reschedule the item under review and end the session."
   (interactive)
   (ir--reschedule-current)
+  (setq ir--current-id nil)
   (when ir-session-in-new-frame
     (delete-frame)))
 
