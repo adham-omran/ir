@@ -1,0 +1,68 @@
+#+title: ir.el post-0.13.0 fixes & pending narrow fix
+#+date: 2026-06-01
+#+startup: content
+
+* Status
+Working tree clean on =development=; the fixes below are committed (recent:
+d5bb09e, a2c865a, 0df16c6, 026320c). The file-level-node narrow fix (see Pending)
+is specced but not implemented. To deploy to a running Doom session: push +
+=doom sync= + restart (straight builds from github adham-omran/ir@development).
+
+* Shipped since 0.13.0 (committed)
+- New command =(ir-add-roam-directory)=: queues every Org-roam node via =org-roam-node-list= (dup-safe).
+- Autoload: 14 =;;;###autoload= cookies on the interactive commands, so =M-x= sees them after =doom sync= (no config loader needed for availability).
+- =ir--id-at-point= guard: =org-id-get= runs only in Org buffers, fixing the =org-element= / "rx ** range error" crash when commands ran from non-Org buffers (=ir-read-next=, =ir-add=, =ir-navigate-to-heading=, =ir-find-item-at-point=).
+- Non-destructive unresolved handling: an item whose heading can't open no longer auto-deletes; =ir--open-next= offers to prune a genuinely-dead row (accept → delete + continue, decline → stop).
+- =org-roam= soft-loaded in =ir--reading-setup= so its =org-id-find= advice resolves roam-node ids from the roam database.
+- =ir--id-title= reads titles from the Org-roam db (or returns the id), never by visiting files — fixed the =ir-delete= freeze (it had opened every file in the queue).
+- README Tutorial written around =ir-start-session=.
+
+* Learned
+- Org 9.7+ routes =org-id-get= through =org-element-at-point=, which errors in non-Org buffers ("rx ** range error"); guard with =(derived-mode-p 'org-mode)=.
+- =org-roam= advises =org-id-find= (=:before-until=, org-roam-id.el:62), so =org-id-open= resolves roam ids from the roam db — but only when org-roam is loaded.
+- Recurring bug class: an over-broad =condition-case= in =ir--reading-setup= routed non-resolution errors (and presentation errors) into the destructive delete path. The catch must be scoped to resolution only.
+
+* Pending: file-level-node narrow fix (specced, not implemented)
+** Root cause (confirmed, reproduced)
+=ir--reading-setup= calls =org-narrow-to-subtree= unconditionally.
+A file-level Org-roam node (=:ID:= in a top property drawer, no =*= heading) has
+no subtree, so =org-narrow-to-subtree= raises =outline-before-first-heading=.
+The over-broad =condition-case= reports this as "cannot open" and prompts to
+delete a *valid* row; =org-id-open= itself succeeds (the file opens).
+Affects ~all file-level nodes (observed on an 811-item roam queue).
+Until fixed, answer =n= (never =y=) to the prompt — the rows are valid.
+
+** Spec
+*** 1 Shape-aware display helper (one narrowing boundary)
+- [ ] 1.1 =MUST= Add =ir--narrow-to-item=: =(widen)=, then =org-narrow-to-subtree= only when =(not (org-before-first-heading-p))=; else leave the whole file visible. Verify: file-level node → no error, whole file shown; heading → subtree narrowed.
+*** 2 ir--reading-setup rework
+- [ ] 2.1 =MUST= Scope the resolution =condition-case= to =org-id-open= only; return =unresolved= iff open errors. Verify: bogus id → unresolved; resolvable id → never unresolved.
+- [ ] 2.2 =MUST= On success: =delete-other-windows=, =ir--narrow-to-item=, return =ok=. Verify: file-level node → ok, whole file, single window, no prompt.
+- [ ] 2.3 =MUST= Narrowing runs outside the resolution catch. Verify: file-level case returns ok, not unresolved.
+- [ ] 2.4 =MUST= Keep =(require 'org-roam nil t)=. Verify: roam ids resolve.
+*** 3 ir-navigate-to-heading (same latent bug, ir.el:399)
+- [ ] 3.1 =MUST= Replace its unconditional =org-narrow-to-subtree= with =ir--narrow-to-item=. Verify: navigating to a file-level node id widens without =outline-before-first-heading=.
+*** 4 Unchanged contracts (verify, no edit)
+- [ ] 4.1 =MUST= =ir--open-next=: ok→read, unresolved→prompt, now reached only on a true resolution failure.
+- [ ] 4.2 =MUST= =ir-open= inherits the fix via =ir--reading-setup=.
+*** 5 Verification
+- [ ] 5.1 =MUST= Headless: file-level node (top =:ID:=, no heading) → ok, buffer not narrowed.
+- [ ] 5.2 =MUST= Headless: heading item → ok, narrowed to subtree.
+- [ ] 5.3 =MUST= Headless: bogus id → unresolved.
+- [ ] 5.4 =SHOULD= byte-compile + checkdoc clean (0/0).
+*** 6 Out of scope
+- [ ] 6.1 =WONT= schema/algorithm change or =path= column.
+- [ ] 6.2 =WONT= bulk-repair the valid rows.
+
+** Open decisions
+- D1 file-level presentation = widen / show whole file (proposed). Alt: narrow to a sub-region.
+- D2 =ir--narrow-to-item= shared so it also fixes =ir-navigate-to-heading= (proposed yes). Alt: fix =ir--reading-setup= only.
+
+* Also pending: (ir-done-and-delete) (researched, not specced)
+Mark the item at point done, delete the original file, and delete its db row.
+Blocked on file-vs-heading semantics: a file-level node maps 1:1 to a file (safe
+to delete), but a heading item (extract, plain heading) shares a file, so
+deleting "the original file" destroys the source/siblings. Open forks: unit of
+"the file" (file-level only vs delete subtree for headings), "done" meaning
+(pure delete vs log), trash vs permanent, confirmation, collateral cleanup
+(orphaned sibling rows, stale =org-id-locations= / roam db, live buffer).
