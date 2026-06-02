@@ -5,8 +5,8 @@
 ;; Author: Adham Omran <adham.rasoul@gmail.com>
 ;; Maintainer: Adham Omran <adham.rasoul@gmail.com>
 ;; Created: June 22, 2022
-;; Modified: June 01, 2026
-;; Version: 0.14.0
+;; Modified: June 02, 2026
+;; Version: 0.15.0
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
 ;; Package-Requires: ((emacs "29.1") (org-roam "2.3"))
@@ -217,12 +217,39 @@ buffers under Org 9.7+."
 Set by `ir--open-next' when an item opens; read by `ir--reschedule-current' so a
 review is recorded for the opened item regardless of where point drifts.")
 
+(defvar ir--session-active nil
+  "Non-nil while a review session is active; the gate for queue commands.
+Set by `ir-start-session', cleared by `ir-end-session'.")
+
+(defvar ir--session-count 0
+  "Items read in the active session; reported by `ir-end-session'.")
+
+(defvar ir--session-start-time nil
+  "Unix seconds at which the active session started, or nil between sessions.")
+
 (defun ir--reschedule-current ()
-  "Reschedule the item currently under review (`ir--current-id').
-No-op with a message when no item is under review."
-  (if (and ir--current-id (ir--item ir--current-id))
-      (ir--reschedule ir--current-id)
-    (message "IR: no item under review")))
+  "Reschedule the item under review and count it as read.
+No-op when no item is under review (e.g. the queue drained mid-session)."
+  (when (and ir--current-id (ir--item ir--current-id))
+    (ir--reschedule ir--current-id)
+    (cl-incf ir--session-count)))
+
+(defun ir--require-session ()
+  "Signal a `user-error' unless a review session is active.
+Precondition of every command except `ir-start-session' and the importers."
+  (unless ir--session-active
+    (user-error "IR: not in a session (start one with `ir-start-session')")))
+
+(defun ir--require-current ()
+  "Signal a `user-error' unless a session is active with an item under review."
+  (ir--require-session)
+  (unless (and ir--current-id (ir--item ir--current-id))
+    (user-error "IR: no item under review")))
+
+(defun ir--format-elapsed (seconds)
+  "Format integer SECONDS as an \"H:MM\" hours-and-minutes string."
+  (let ((minutes (floor seconds 60)))
+    (format "%d:%02d" (/ minutes 60) (% minutes 60))))
 
 ;; --- Import: register an existing org-id ------------------------------------
 
@@ -302,13 +329,15 @@ TEXT as its body; return the child's org-id."
 ;;;###autoload
 (defun ir-extract-region ()
   "Extract the active region into a scheduled child heading, copied in place.
-Precondition: an Org buffer with an active region under a heading.
+Precondition: a session is active, in an Org buffer with an active region under
+a heading.
 Postcondition: a new child subheading holds a copy of the region, the
 parent text is unchanged, the child is queued, and point returns to the
 region start.
 Declines (no mutation) on a non-Org buffer, no region, or no enclosing
 heading."
   (interactive)
+  (ir--require-session)
   (unless (derived-mode-p 'org-mode)
     (user-error "IR: extraction works only in Org buffers"))
   (unless (use-region-p)
@@ -381,36 +410,74 @@ delete its stale queue row and continue; declining stops the session."
 ;;;###autoload
 (defun ir-start-session ()
   "Begin a review session at the most-due item.
-Postcondition: with `ir-session-in-new-frame', a fullscreen frame named
-\"ir-session\" is created first."
+No-op with a message when a session is already active; ending it is the only
+exit.  Postcondition: when an item opens, `ir--session-active' is t (and with
+`ir-session-in-new-frame' a fullscreen frame \"ir-session\" exists); an empty
+queue or a declined stale item leaves no session active."
   (interactive)
-  (when ir-session-in-new-frame
-    (make-frame '((name . "ir-session")))
-    (select-frame-by-name "ir-session")
-    (toggle-frame-fullscreen))
-  (ir--open-next))
+  (if ir--session-active
+      (message "IR: already in a session")
+    (when ir-session-in-new-frame
+      (make-frame '((name . "ir-session")))
+      (select-frame-by-name "ir-session")
+      (toggle-frame-fullscreen))
+    (setq ir--session-active t
+          ir--session-count 0
+          ir--session-start-time (ir--now))
+    (ir--open-next)
+    (unless ir--current-id
+      (setq ir--session-active nil)
+      (when ir-session-in-new-frame (delete-frame)))))
 
 ;;;###autoload
 (defun ir-read-next ()
   "Reschedule the item under review, then open the next due one.
-Precondition: point is within the heading of the item under review."
+Precondition: a session is active with an item under review."
   (interactive)
+  (ir--require-current)
   (ir--reschedule-current)
   (ir--open-next))
 
 ;;;###autoload
 (defun ir-end-session ()
-  "Reschedule the item under review and end the session."
+  "Conclude the active session: reschedule the item under review, then report.
+Reports items read, elapsed time as H:MM, and items still due, and resets all
+session state.  Precondition: a session is active."
   (interactive)
+  (ir--require-session)
   (ir--reschedule-current)
-  (setq ir--current-id nil)
-  (when ir-session-in-new-frame
-    (delete-frame)))
+  (let ((read ir--session-count)
+        (elapsed (ir--format-elapsed (- (ir--now) ir--session-start-time)))
+        (due (caar (sqlite-select
+                    (ir--db) "SELECT COUNT(*) FROM ir WHERE due <= ?"
+                    (list (ir--now))))))
+    (setq ir--session-active nil
+          ir--current-id nil
+          ir--session-count 0
+          ir--session-start-time nil)
+    (when ir-session-in-new-frame
+      (delete-frame))
+    (message "IR: session ended — %d items read in %s, %d still due"
+             read elapsed due)))
+
+;;;###autoload
+(defun ir-set-priority ()
+  "Set the priority of the item under review, clamped to [0,100].
+Lower is sooner: 0 is highest priority, 100 is lowest.  Priority orders the due
+queue only; it does not reschedule the item.
+Precondition: a session is active with an item under review."
+  (interactive)
+  (ir--require-current)
+  (let ((priority (max 0 (min 100 (read-number "Set priority (0 is highest): ")))))
+    (ir--update-column ir--current-id "priority" priority)
+    (message "IR: priority of %s set to %s" ir--current-id priority)))
 
 ;;;###autoload
 (defun ir-validate ()
-  "Report queued ids whose Org heading no longer exists; mutate nothing."
+  "Report queued ids whose Org heading no longer exists; mutate nothing.
+Precondition: a session is active."
   (interactive)
+  (ir--require-session)
   (let ((orphans (cl-remove-if #'org-id-find-id-file (ir--all-ids))))
     (message "IR: %d orphan(s)%s" (length orphans)
              (if orphans (format ": %S" orphans) ""))))
@@ -421,18 +488,16 @@ Precondition: point is within the heading of the item under review."
 (defun ir-navigate-to-heading (&optional id)
   "Jump to the Org heading for ID, widened then narrowed.
 ID defaults to the org-id at point; messages and does nothing when none is
-available.  Precondition: ID resolves to an existing heading or file node."
+available.  Precondition: a session is active; ID resolves to an existing
+heading or file node."
   (interactive)
+  (ir--require-session)
   (let ((id (or id (ir--id-at-point))))
     (if id
         (progn (org-id-open id nil) (ir--narrow-to-item))
       (message "IR: no org-id at point"))))
 
 ;; --- View & maintenance -----------------------------------------------------
-
-(defun ir--format-time (n)
-  "Render integer Unix-seconds N as an ISO date string."
-  (format-time-string "%F" n))
 
 (defun ir--id-title (id)
   "Return a display label for ID without visiting any file.
@@ -448,31 +513,13 @@ Uses the Org-roam database title when available, otherwise ID itself."
     (cdr (assoc (completing-read prompt alist nil t) alist))))
 
 ;;;###autoload
-(defun ir-view ()
-  "Show all queued items as an Org table ordered by due date."
-  (interactive)
-  (let ((items (ir--select
-                (concat "SELECT " ir--columns " FROM ir ORDER BY due ASC"))))
-    (pop-to-buffer (get-buffer-create "*ir-view*"))
-    (erase-buffer)
-    (org-mode)
-    (insert "| ID | AF | Interval | Priority | Due |\n|-\n")
-    (dolist (it items)
-      (insert (format "| %s | %.3f | %d | %.1f | %s |\n"
-                      (plist-get it :id)
-                      (plist-get it :afactor)
-                      (plist-get it :interval)
-                      (plist-get it :priority)
-                      (ir--format-time (plist-get it :due)))))
-    (goto-char (point-min))
-    (org-table-align)))
-
-;;;###autoload
 (defun ir-edit ()
   "Edit one scheduling column of a queued item chosen by completion.
 The id column is immutable; editing `interval' reschedules `due' to now
-plus that many days, and editing `due' sets the next date directly."
+plus that many days, and editing `due' sets the next date directly.
+Precondition: a session is active."
   (interactive)
+  (ir--require-session)
   (let ((id (ir--read-id "Edit item: "))
         (column (completing-read "Column: " ir--editable-columns nil t)))
     (pcase column
@@ -487,14 +534,6 @@ plus that many days, and editing `due' sets the next date directly."
       ((or "afactor" "priority")
        (ir--update-column id column (read-number (format "New %s: " column)))))
     (message "IR: updated %s of %s" column id)))
-
-;;;###autoload
-(defun ir-delete ()
-  "Delete a queued item's row chosen by completion; leave its heading intact."
-  (interactive)
-  (let ((id (ir--read-id "Delete item: ")))
-    (ir--delete id)
-    (message "IR: deleted %s" id)))
 
 ;; --- Done & delete ----------------------------------------------------------
 
@@ -559,16 +598,14 @@ Postcondition: the heading's subtree is removed from the file (recoverable via
 ;;;###autoload
 (defun ir-done-and-delete ()
   "Complete the item under review: delete it and its row, then advance.
-Acts on `ir--current-id' (the item under review); with no session, on the queued
-item at point.  A file-level node deletes its file; a heading cuts its subtree,
-keeping the file.  Logs to `ir-done-log-file' and confirms -- disclosing other
-queued items in the file and incoming backlinks -- before deleting.  When the
-deleted item was under review, opens the next due item.
-Precondition: a review item exists, or point is on a queued item."
+Acts on `ir--current-id'.  A file-level node deletes its file; a heading cuts
+its subtree, keeping the file.  Logs to `ir-done-log-file' and confirms --
+disclosing other queued items in the file and incoming backlinks -- before
+deleting.  Opens the next due item afterward.
+Precondition: a session is active with an item under review."
   (interactive)
-  (let ((id (or ir--current-id (ir--id-at-point))))
-    (unless (and id (ir--item id))
-      (user-error "IR: no review item, and point is not on a queued item"))
+  (ir--require-current)
+  (let ((id ir--current-id))
     (condition-case nil
         (org-id-open id nil)
       (error (user-error "IR: cannot open %s" id)))
@@ -599,21 +636,24 @@ Precondition: a review item exists, or point is on a queued item."
         (if file-level
             (ir--done-delete-file id file siblings)
           (ir--done-cut-subtree id))
-        (when (equal id ir--current-id)
-          (ir--open-next))))))
+        (ir--open-next)))))
 
 ;;;###autoload
 (defun ir-open ()
-  "Open a queued item chosen by title, narrowed for reading."
+  "Open a queued item chosen by title, narrowed for reading.
+Precondition: a session is active."
   (interactive)
+  (ir--require-session)
   (let ((id (ir--read-id "Open item: ")))
     (unless (eq (ir--reading-setup (ir--item id)) 'ok)
       (message "IR: cannot open %s (heading missing or id not indexed)" id))))
 
 ;;;###autoload
 (defun ir-find-item-at-point ()
-  "Echo the queue row for the org-id of the heading at point."
+  "Echo the queue row for the org-id of the heading at point.
+Precondition: a session is active."
   (interactive)
+  (ir--require-session)
   (let ((id (ir--id-at-point)))
     (message "%S" (and id (ir--item id)))))
 

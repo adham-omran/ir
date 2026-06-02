@@ -26,20 +26,21 @@ application and is no longer part of this package.
 - Put point on any Org heading (plain Org or an Org-roam node) and run =M-x ir-add= to queue it.
 - =M-x ir-add-roam-node= queues an Org-roam node chosen by title.
 - =M-x ir-add-roam-directory= queues every Org-roam node at once.
-- While reading, select a region and run =M-x ir-extract-region= to carve it into a scheduled child heading (the parent text is kept).
+- While reading in a session, select a region and run =M-x ir-extract-region= to carve it into a scheduled child heading (the parent text is kept).
 
 ** Read on a schedule
-1. =M-x ir-start-session= opens the most-due item and narrows you into it. Run it from anywhere.
+1. =M-x ir-start-session= opens the most-due item and narrows you into it. Run it from anywhere; every other =ir= command requires an active session.
 2. Read the item. Extract fragments with =ir-extract-region= as you go.
-3. =M-x ir-read-next= records this item (advances its interval) and opens the next. Run it from within the item — the session keeps point there.
-4. Repeat until you see "queue empty for today".
-5. =M-x ir-end-session= records the last item and ends the session (closing the session frame if =ir-session-in-new-frame= is set).
+3. =M-x ir-read-next= records this item (advances its interval) and opens the next. It acts on the item the session opened, wherever point has drifted.
+4. =M-x ir-set-priority= sets the priority of the item under review (0 is highest, 100 lowest); it reorders the queue without rescheduling.
+5. Repeat until you see "queue empty for today".
+6. =M-x ir-end-session= records the last item and reports items read, elapsed time, and items still due (closing the session frame if =ir-session-in-new-frame= is set).
 
 During review, =M-x ir-done-and-delete= finishes with the current item: it
 deletes the note (a whole-file node to trash, or cuts a heading's subtree),
-records it in =ir-done-log-file=, and advances to the next item. =ir-read-next=
-and =ir-done-and-delete= act on the item the session opened, so they work even if
-point has moved to another buffer.
+records it in =ir-done-log-file=, and advances to the next item. Every in-session
+command (=ir-read-next=, =ir-set-priority=, =ir-done-and-delete=) acts on the item
+the session opened, so they work even if point has moved to another buffer.
 
 If =ir-start-session= reports "cannot open ... id not indexed" for Org-roam
 nodes, sync the Org-roam database with =M-x org-roam-db-sync= so the ids
@@ -47,6 +48,11 @@ resolve.
 
 * Development
 ** Changelog
+- 0.15.0
+  - Gate the queue behind a session: every command except =(ir-start-session)= and the importers (=(ir-add)=, =(ir-add-roam-node)=, =(ir-add-roam-directory)=) now requires an active session.
+  - Add =(ir-set-priority)=: set the priority of the item under review, clamped to [0,100].
+  - =(ir-end-session)= reports items read, elapsed time, and items still due.
+  - Remove =(ir-view)= and =(ir-delete)=.
 - 0.14.0
   - Add =(ir-done-and-delete)=: complete the item under review -- trash its file or cut its subtree, log it to =ir-done-log-file=, and advance.
   - Add =(ir-add-roam-directory)= to queue every Org-roam node at once.
@@ -87,10 +93,6 @@ resolve.
 - [ ] =(ir-reset)=
 
   Reset all items to default values.
-- [ ] =(ir-delete-at-point)=
-
-  Delete the entry and its header.
-  - [ ] How to handle children?
 ** Possible Features
 - [ ] Batch import.
 ** Implementation of question creation
@@ -100,8 +102,8 @@ using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 ** Why =(ir-open)= deletes other windows?
 Since you are not supposed to manually open material. (ir-open) assumes you want
 to take notes on a specific piece of material. So it sets up the frame for that.
-My suggestion is to start a session then use (ir-open) then end the session when
-done with the manual study.
+=(ir-open)= now requires an active session: start a session, use (ir-open), then
+end the session when done with the manual study.
 * Design of the Database
 Using the built-in ~sqlite.el~ the schema is:
 

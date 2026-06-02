@@ -1,0 +1,107 @@
+#+title: ir.el 0.15.0 — session-gating + (ir-set-priority)
+#+date: 2026-06-02
+#+startup: content
+
+* Status
+Specced via Research → Design → Spec; not implemented. Target: 0.15.0.
+Header currently =0.14.0= (ir.el:9); this cycle bumps the minor.
+Obligation levels: MUST / SHOULD / MAY / WONT.
+
+* Goal
+Gate the queue commands behind an explicit session and add =(ir-set-priority)=.
+- All commands except bootstrap (start + add*) require an active session.
+- =(ir-set-priority)= sets =priority= on the item under review (=ir--current-id=).
+- =(ir-end-session)= concludes with a summary line.
+- Remove =(ir-view)= and the =(ir-delete)= command.
+
+* Decisions locked
+| Fork                 | Resolution                                                              |
+|----------------------+-------------------------------------------------------------------------|
+| D1 gating scope      | Maximal — every non-bootstrap command gated behind a session           |
+| D2 session state     | Explicit flag + read counter (+ start-time for duration)               |
+| D3 end summary       | =N items read in H:MM, K still due= — no completion count              |
+| D4 priority entry    | =read-number=, hint "Set priority (0 is highest)", clamp to [0,100]    |
+| D5 session model     | Binary active/not; end is terminal; no resume                          |
+| Target item          | =ir--current-id= only; point fallback dropped everywhere               |
+| Removals             | =ir-view=, =ir-delete= (command); =ir--delete= helper kept             |
+| Version              | bump minor 0.14.0 → 0.15.0                                              |
+
+* Confirmed mechanics (verified in-session)
+- =ir--delete= helper retained — callers at ir.el:376,539,556 survive the =ir-delete= command removal.
+- =ir-navigate-to-heading= / =ir-edit= / =ir-open= have no internal callers — safe to gate.
+- =ir--format-time= is orphaned by =ir-view= removal (sole caller ir.el:466) — remove it.
+- =ir--select= / =ir--columns= retained — used at ir.el:146,150,332.
+- =priority= is a pure order key (=ORDER BY priority ASC=, ir.el:334) — set-priority needs no reschedule.
+- Counter site: =ir--reschedule-current= success branch (ir.el:223-224) fires from both =ir-read-next= and =ir-end-session= → the last item counts (N3a).
+
+* Contract
+- pre: =ir--session-active= for all gated commands; additionally =ir--current-id= non-nil for read-next / set-priority / done-and-delete.
+- post: a gated command outside a session signals =user-error= and mutates nothing; =ir-end-session= reports the summary and clears all session state.
+- invariant: =ir--current-id= is the sole target of in-session item commands (no point fallback); bootstrap commands (start, add*) are never gated.
+
+* WBS
+
+** 1 Session state (3 module vars)
+- [ ] 1.1 =MUST= Add =ir--session-active= (bool). Verify: nil at load; t only between start and end.
+- [ ] 1.2 =MUST= Add =ir--session-count= (int). Verify: 0 at fresh start; equals read tally at end.
+- [ ] 1.3 =MUST= Add =ir--session-start-time=. Verify: set at fresh start; read once at end.
+- [ ] 1.4 =WONT= Add a completion counter. Verify: no =ir--session-completed= symbol exists.
+- [ ] 1.5 =MUST= Increment =ir--session-count= in =ir--reschedule-current='s success branch only. Verify: K =ir-read-next= + one =ir-end-session= on a non-empty session → count == K+1; a no-op reschedule does not increment.
+
+** 2 Session lifecycle
+- [ ] 2.1 =MUST= =ir-start-session=, when not active: set active=t, count=0, start-time=now, then =ir--open-next=. Verify: state initialized, most-due item opened.
+- [ ] 2.2 =MUST= =ir-start-session=, if =ir--open-next= finds nothing due, revert active=nil and report empty. Verify: empty queue → active nil afterward, message names empty queue. (interpretation 8.1)
+- [ ] 2.3 =MUST= =ir-start-session= while already active: no-op + message; no reset of counters/start-time. Verify: calling twice leaves count/start-time unchanged. (interpretation 8.2)
+- [ ] 2.4 =MUST= =ir-end-session=: reschedule current (if any), compute K, emit summary, clear all session state. Verify: post-call active nil and =ir--current-id= nil.
+- [ ] 2.5 =MUST= Summary = =IR: session ended — %d items read in %s, %d still due= (%s = =now−start-time= as H:MM). Verify: matches =session ended — [0-9]+ items read in [0-9]+:[0-9]\{2\}, [0-9]+ still due=.
+- [ ] 2.6 =MUST= K = =SELECT COUNT(*) FROM ir WHERE due <= now=, after 2.4's reschedule. Verify: the just-rescheduled final item is excluded from K.
+- [ ] 2.7 =SHOULD= Frame teardown under =ir-session-in-new-frame= runs after the summary is emitted. Verify: summary visible in the surviving frame. (interpretation 8.3)
+- [ ] 2.8 =MUST= =ir-read-next= flow unchanged (=reschedule-current= → =open-next=); gating per §4. Verify: advances and counts via 1.5.
+
+** 3 (ir-set-priority) — new command
+- [ ] 3.1 =MUST= =;;;###autoload=, interactive, named =ir-set-priority=. Verify: =M-x= resolves after =doom sync=.
+- [ ] 3.2 =MUST= Act on =ir--current-id= only — no point fallback. Verify: point on a different heading mid-session → session item's priority changes, not the heading at point.
+- [ ] 3.3 =MUST= Prompt =read-number= with literal hint =Set priority (0 is highest): =. Verify: prompt matches exactly.
+- [ ] 3.4 =MUST= Clamp entered value to [0,100] before writing. Verify: −5 → 0; 250 → 100; 30 → 30.
+- [ ] 3.5 =MUST= Write via =ir--update-column ir--current-id "priority" v=; no reschedule. Verify: due/interval/afactor/last_reviewed unchanged after the call.
+- [ ] 3.6 =SHOULD= Confirm with =IR: priority of %s set to %s=. Verify: message names id and clamped value.
+
+** 4 Gating (maximal scope)
+- [ ] 4.1 =MUST= Session guard (e.g. =ir--require-session=): =user-error= when =ir--session-active= nil, naming the remedy, mutating nothing. Verify: each gated command with active=nil signals =user-error=, changes no row.
+- [ ] 4.2 =MUST= Current-item guard: =user-error= when =ir--current-id= nil or its row gone. Verify: active=t but current-id nil (drained) → §4.4 commands refuse.
+- [ ] 4.3 =MUST= Active-only commands call 4.1 first: =ir-end-session=, =ir-extract-region=, =ir-edit=, =ir-open=, =ir-validate=, =ir-navigate-to-heading=, =ir-find-item-at-point=. Verify: each refuses outside a session.
+- [ ] 4.4 =MUST= Active+current commands call 4.1 then 4.2: =ir-read-next=, =ir-set-priority=, =ir-done-and-delete=. Verify: each refuses when no current item.
+- [ ] 4.5 =MUST= Ungated (bootstrap): =ir-start-session=, =ir-add=, =ir-add-roam-node=, =ir-add-roam-directory=. Verify: each works with active=nil.
+- [ ] 4.6 =MUST= =ir-done-and-delete= drops its =(or ir--current-id (ir--id-at-point))= fallback (ir.el:569) — target always =ir--current-id=, always advances. Verify: the =(equal id ir--current-id)= guard (ir.el:602) is always true; point on arbitrary heading no longer completes it.
+
+** 5 Removals
+- [ ] 5.1 =MUST= Remove =ir-view= command + autoload (ir.el:450-468). Verify: symbol absent, no autoload cookie.
+- [ ] 5.2 =MUST= Remove =ir--format-time= (ir.el:433-435), orphaned by 5.1. Verify: byte-compile reports no unused/undefined-function warning.
+- [ ] 5.3 =MUST= Remove =ir-delete= command + autoload (ir.el:492-497). Verify: symbol absent.
+- [ ] 5.4 =MUST= Keep =ir--delete= helper. Verify: byte-compile clean; done-and-delete and stale-row pruning still work.
+- [ ] 5.5 =MUST= Keep =ir--select= / =ir--columns=. Verify: present and referenced.
+
+** 6 Documentation
+- [ ] 6.1 =MUST= Update README.org:36 (=ir-end-session= summary) and 41-44 (all in-session commands act on =ir--current-id=). Verify: README describes summary fields and current-id targeting.
+- [ ] 6.2 =MUST= Add a CHANGELOG entry: session-gating, =ir-view=/=ir-delete= removal, =ir-set-priority= addition; leave historical entries (README.org:64,68) intact. Verify: a new version entry exists.
+- [ ] 6.3 =SHOULD= Reconcile README.org:100-103 (=ir-open= FAQ) with mandatory gating and the README.org:90 =(ir-delete-at-point)= TODO. Verify: FAQ notes =ir-open= requires a session; stale TODO resolved.
+- [ ] 6.4 =MUST= Update CLAUDE.md "Reading & views", "Completion: ir-done-and-delete", "Review-item model" to match §2-§5. Verify: no CLAUDE.md sentence contradicts shipped behavior.
+- [ ] 6.5 =SHOULD= Bump =;; Version:= header 0.14.0 → 0.15.0. Verify: header reads 0.15.0.
+
+** 7 Verification
+- [ ] 7.1 =MUST= Byte-compile warning-free + checkdoc clean. Verify: both 0/0.
+- [ ] 7.2 =MUST= Headless: clamp (3.4), guards refusing with =user-error= outside session (4.1-4.4), counter math (1.5). Verify: batch script asserts each.
+- [ ] 7.3 =MUST= Manual: full session flow, summary string with real duration, frame teardown (2.7), set-priority during a session. Verify: observed once.
+- [ ] 7.4 =MUST= =doom sync= regenerates =ir-autoloads.el=. Verify: =M-x= lists =ir-set-priority=, not =ir-view=/=ir-delete=.
+
+* Interpretations applied (flagged — veto any)
+- 8.1 Empty-queue start does not enter a session (2.2). [probable]
+- 8.2 Re-start while active is a no-op message, not a restart (2.3). [probable]
+- 8.3 Frame teardown after the summary (2.7). [probable]
+- 8.4 =H:MM= duration assumes sessions < 24h; longer renders with hour wrap. [uncertain]
+
+* Out of scope (WONT)
+- 9.1 =WONT= per-item priority tiers/labels, prefix-arg entry, or a keybinding map.
+- 9.2 =WONT= make =ir-open= retarget =ir--current-id=.
+- 9.3 =WONT= touch the SQLite schema (=priority= column already exists, ir.el:82).
+- 9.4 =WONT= repair =ir-done-and-delete= dangling backlinks.
