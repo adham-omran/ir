@@ -247,9 +247,9 @@ Precondition of every command except `ir-start-session' and the importers."
     (user-error "IR: no item under review")))
 
 (defun ir--format-elapsed (seconds)
-  "Format integer SECONDS as an \"H:MM\" hours-and-minutes string."
-  (let ((minutes (floor seconds 60)))
-    (format "%d:%02d" (/ minutes 60) (% minutes 60))))
+  "Format integer SECONDS as an \"H:MM:SS\" string (hours unbounded, no wrap)."
+  (format "%d:%02d:%02d"
+          (/ seconds 3600) (% (/ seconds 60) 60) (% seconds 60)))
 
 ;; --- Import: register an existing org-id ------------------------------------
 
@@ -441,7 +441,7 @@ Precondition: a session is active with an item under review."
 ;;;###autoload
 (defun ir-end-session ()
   "Conclude the active session: reschedule the item under review, then report.
-Reports items read, elapsed time as H:MM, and items still due, and resets all
+Reports items read, elapsed time as H:MM:SS, and items still due, and resets all
 session state.  Precondition: a session is active."
   (interactive)
   (ir--require-session)

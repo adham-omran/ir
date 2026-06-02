@@ -19,7 +19,7 @@ Gate the queue commands behind an explicit session and add =(ir-set-priority)=.
 |----------------------+-------------------------------------------------------------------------|
 | D1 gating scope      | Maximal — every non-bootstrap command gated behind a session           |
 | D2 session state     | Explicit flag + read counter (+ start-time for duration)               |
-| D3 end summary       | =N items read in H:MM, K still due= — no completion count              |
+| D3 end summary       | =N items read in H:MM:SS, K still due= — no completion count           |
 | D4 priority entry    | =read-number=, hint "Set priority (0 is highest)", clamp to [0,100]    |
 | D5 session model     | Binary active/not; end is terminal; no resume                          |
 | Target item          | =ir--current-id= only; point fallback dropped everywhere               |
@@ -53,7 +53,7 @@ Gate the queue commands behind an explicit session and add =(ir-set-priority)=.
 - [ ] 2.2 =MUST= =ir-start-session=, if =ir--open-next= finds nothing due, revert active=nil and report empty. Verify: empty queue → active nil afterward, message names empty queue. (interpretation 8.1)
 - [ ] 2.3 =MUST= =ir-start-session= while already active: no-op + message; no reset of counters/start-time. Verify: calling twice leaves count/start-time unchanged. (interpretation 8.2)
 - [ ] 2.4 =MUST= =ir-end-session=: reschedule current (if any), compute K, emit summary, clear all session state. Verify: post-call active nil and =ir--current-id= nil.
-- [ ] 2.5 =MUST= Summary = =IR: session ended — %d items read in %s, %d still due= (%s = =now−start-time= as H:MM). Verify: matches =session ended — [0-9]+ items read in [0-9]+:[0-9]\{2\}, [0-9]+ still due=.
+- [ ] 2.5 =MUST= Summary = =IR: session ended — %d items read in %s, %d still due= (%s = =now−start-time= as H:MM:SS). Verify: matches =session ended — [0-9]+ items read in [0-9]+:[0-9]\{2\}:[0-9]\{2\}, [0-9]+ still due=.  (H:MM dropped seconds, so a sub-minute session rendered a nonsensical 0:00.)
 - [ ] 2.6 =MUST= K = =SELECT COUNT(*) FROM ir WHERE due <= now=, after 2.4's reschedule. Verify: the just-rescheduled final item is excluded from K.
 - [ ] 2.7 =SHOULD= Frame teardown under =ir-session-in-new-frame= runs after the summary is emitted. Verify: summary visible in the surviving frame. (interpretation 8.3)
 - [ ] 2.8 =MUST= =ir-read-next= flow unchanged (=reschedule-current= → =open-next=); gating per §4. Verify: advances and counts via 1.5.
@@ -98,7 +98,7 @@ Gate the queue commands behind an explicit session and add =(ir-set-priority)=.
 - 8.1 Empty-queue start does not enter a session (2.2). [probable]
 - 8.2 Re-start while active is a no-op message, not a restart (2.3). [probable]
 - 8.3 Frame teardown after the summary (2.7). [probable]
-- 8.4 =H:MM= duration assumes sessions < 24h; longer renders with hour wrap. [uncertain]
+- 8.4 RESOLVED — duration is H:MM:SS via integer division: hours unbounded, no wrap, sub-minute sessions visible (e.g. 0:00:45). [confirmed]
 
 * Out of scope (WONT)
 - 9.1 =WONT= per-item priority tiers/labels, prefix-arg entry, or a keybinding map.
