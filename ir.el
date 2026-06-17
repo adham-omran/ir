@@ -9,7 +9,7 @@
 ;; Version: 0.15.0
 ;; Keywords: wp, incremental reading
 ;; Homepage: https://github.com/adham-omran/ir
-;; Package-Requires: ((emacs "29.1") (org-roam "2.3"))
+;; Package-Requires: ((emacs "29.1") (org-roam "2.3") (gptel "0.9.0"))
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
@@ -30,6 +30,7 @@
 (require 'org-id)
 (require 'sqlite)
 (require 'cl-lib)
+(require 'gptel)
 
 (declare-function org-roam-node-read "ext:org-roam")
 (declare-function org-roam-node-id "ext:org-roam")
@@ -656,6 +657,174 @@ Precondition: a session is active."
   (ir--require-session)
   (let ((id (ir--id-at-point)))
     (message "%S" (and id (ir--item id)))))
+
+;; --- Generative card creation (OpenAI via gptel) ----------------------------
+
+(defcustom ir-gen-card-count 3
+  "Number of flashcards `ir-gen-basic'/`ir-gen-cloze' request by default.
+A numeric prefix argument to either command overrides this."
+  :type 'integer)
+
+(defcustom ir-gen-use-context nil
+  "If non-nil, send surrounding text as context to improve generation.
+The context source is `ir-gen-context-source'."
+  :type 'boolean)
+
+(defcustom ir-gen-context-source 'buffer
+  "Where `ir-gen-use-context' draws context from.
+Only `buffer' (the whole current buffer) is supported."
+  :type '(choice (const buffer)))
+
+(defcustom ir-gen-context-property "IR_CONTEXT"
+  "Org property whose value prefixes each generated card as its context.
+Read with inheritance, so a file-level #+PROPERTY or an ancestor drawer
+applies.  Set to nil to emit cards without a context prefix."
+  :type '(choice string (const nil)))
+
+(defconst ir--gen-prompts-directory
+  (expand-file-name
+   "prompts/"
+   (file-name-directory (or load-file-name (locate-library "ir") default-directory)))
+  "Directory holding the card-generation prompt templates.
+Resolved at load time relative to this file; the recipe must ship `prompts/'.")
+
+(defun ir--gen-load-prompt (filename)
+  "Return the contents of FILENAME under `ir--gen-prompts-directory'.
+Precondition: FILENAME exists there -- a packaging invariant, not user input.
+Signals `file-missing' otherwise (a build/recipe bug)."
+  (with-temp-buffer
+    (insert-file-contents (expand-file-name filename ir--gen-prompts-directory))
+    (buffer-string)))
+
+(defun ir--gen-context-text ()
+  "Return buffer text to send as LLM context, or nil when context is off.
+Honors `ir-gen-use-context' and `ir-gen-context-source'."
+  (when ir-gen-use-context
+    (pcase ir-gen-context-source
+      ('buffer (buffer-substring-no-properties (point-min) (point-max)))
+      (other (user-error "IR: unknown `ir-gen-context-source': %S" other)))))
+
+(defun ir--gen-prefix ()
+  "Return the card-context prefix from `ir-gen-context-property', or nil.
+Reads the property with inheritance; nil when the var or the property is unset."
+  (when ir-gen-context-property
+    (org-entry-get nil ir-gen-context-property t)))
+
+(defun ir--gen-build-system (kind has-context card-count)
+  "Build the system prompt for KIND (`basic' or `cloze').
+HAS-CONTEXT non-nil appends the matching context template.  CARD-COUNT is
+folded into an exact-count instruction.
+Concatenates system.md + the kind file (+ the context file) + instructions."
+  (let ((system (ir--gen-load-prompt "system.md"))
+        (kind-file (ir--gen-load-prompt (pcase kind
+                                          ('basic "basic.md")
+                                          ('cloze "cloze.md"))))
+        (context (when has-context
+                   (ir--gen-load-prompt (pcase kind
+                                          ('basic "context.md")
+                                          ('cloze "context-cloze.md"))))))
+    (concat system "\n\n" kind-file
+            (when context (concat "\n\n" context))
+            "\n\n# Instructions\n\n"
+            (format "Generate EXACTLY %d flashcards from the provided text. " card-count)
+            (format "Return EXACTLY %d items in the JSON array — no more, no fewer. " card-count)
+            "Do not exceed this count even if the content seems to warrant more cards. "
+            "Return only the JSON array, with no prose and no code fences.")))
+
+(defun ir--gen-parse (response)
+  "Parse model RESPONSE into a list of card plists.
+Strips Markdown code fences, then reads a JSON array of objects with keyword
+keys (:q/:a for basic, :c for cloze).
+Signals `user-error' when RESPONSE is not parseable JSON (a model fault)."
+  (let ((cleaned (string-trim
+                  (replace-regexp-in-string "```[a-zA-Z]*" ""
+                                            (string-trim response)))))
+    (condition-case nil
+        (json-parse-string cleaned :object-type 'plist :array-type 'list)
+      (error (user-error "IR: could not parse model response as JSON")))))
+
+(defun ir--gen-normalize-question (q)
+  "Ensure Q ends with a single question mark (ASCII `?' or Arabic `؟').
+Appends `?' only when Q ends with neither."
+  (let ((q (string-trim q)))
+    (if (string-match-p "[?؟]\\'" q) q (concat q "?"))))
+
+(defun ir--gen-format (kind cards prefix)
+  "Format CARDS (plists) of KIND into ankifier-ready plain text.
+PREFIX, when a non-empty string, is prepended as \"PREFIX: \" so ankifier's
+context-question parsing keeps it as the card context.
+Basic: \"[PREFIX: ]Question? Answer\".  Cloze: \"[PREFIX: ]<cloze text>\".
+Cards are separated by a blank line."
+  (let ((pre (if (and prefix (not (string-empty-p prefix)))
+                 (concat prefix ": ")
+               "")))
+    (mapconcat
+     (lambda (card)
+       (pcase kind
+         ('basic (concat pre
+                         (ir--gen-normalize-question (plist-get card :q))
+                         " " (string-trim (plist-get card :a))))
+         ('cloze (concat pre (string-trim (plist-get card :c))))))
+     cards "\n\n")))
+
+(defun ir--gen-insert (text end)
+  "Insert TEXT after buffer position END, separated by a blank line.
+Postcondition: text before END is unchanged; point sits at TEXT's start; the
+mark is deactivated."
+  (goto-char end)
+  (unless (bolp) (insert "\n"))
+  (insert "\n")
+  (let ((start (point)))
+    (insert text "\n")
+    (goto-char start))
+  (deactivate-mark))
+
+(defun ir--gen (kind card-count)
+  "Generate CARD-COUNT KIND (`basic'/`cloze') flashcards from the active region.
+Asynchronous via `gptel-request'; the callback inserts ankifier-ready text
+after the region.  KIND content goes to the model with the built system prompt;
+when `ir-gen-use-context' is on, a JSON {content, context} wrapper is sent.
+Precondition: an active region.  Declines via `user-error' otherwise."
+  (unless (use-region-p)
+    (user-error "IR: no active region to generate from"))
+  (let* ((content (buffer-substring-no-properties (region-beginning) (region-end)))
+         (end (region-end))
+         (context (ir--gen-context-text))
+         (prefix (ir--gen-prefix))
+         (system (ir--gen-build-system kind (and context t) card-count))
+         (user-text (if context
+                        (json-serialize `(:content ,content :context ,context))
+                      content))
+         (buffer (current-buffer)))
+    (message "IR: generating %d %s card(s)…" card-count kind)
+    (gptel-request user-text
+      :system system
+      :callback
+      (lambda (response info)
+        (if (stringp response)
+            (when (buffer-live-p buffer)
+              (with-current-buffer buffer
+                (ir--gen-insert (ir--gen-format kind (ir--gen-parse response) prefix)
+                                end)
+                (message "IR: inserted %s card(s)" kind)))
+          (message "IR: generation failed: %s"
+                   (or (plist-get info :status) "no response")))))))
+
+;;;###autoload
+(defun ir-gen-basic (&optional count)
+  "Generate basic Q&A flashcards from the active region via OpenAI.
+With a numeric prefix COUNT, request that many; otherwise `ir-gen-card-count'.
+Inserts ankifier-ready \"[Context: ]Question? Answer\" text after the region."
+  (interactive "P")
+  (ir--gen 'basic (if (integerp count) count ir-gen-card-count)))
+
+;;;###autoload
+(defun ir-gen-cloze (&optional count)
+  "Generate cloze flashcards from the active region via OpenAI.
+With a numeric prefix COUNT, request that many; otherwise `ir-gen-card-count'.
+Inserts ankifier-ready cloze text (with {{cN::…}}) after the region."
+  (interactive "P")
+  (ir--gen 'cloze (if (integerp count) count ir-gen-card-count)))
 
 (provide 'ir)
 ;;; ir.el ends here
