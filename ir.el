@@ -808,7 +808,9 @@ Precondition: an active region.  Declines via `user-error' otherwise."
                                 end)
                 (message "IR: inserted %s card(s)" kind)))
           (message "IR: generation failed: %s"
-                   (or (plist-get info :status) "no response")))))))
+                   (or (plist-get info :error)
+                       (plist-get info :status)
+                       "no response")))))))
 
 ;;;###autoload
 (defun ir-gen-basic (&optional count)
