@@ -1,0 +1,7 @@
+- You'll be provided the content as a JSON object:
+  - the key `context` representing surrounding text context.
+  - the key `content` represents the text to make cards for.
+- Utilize the context to create clozes for the content, do not make cards about the context, only content.
+- Create cloze deletions ONLY from the content, not from the surrounding context text.
+- Each cloze must still be 1-3 words. If the highlighted content is a long phrase, break it into multiple short clozes within the same card.
+- If the context is "المادة" this means it is legal and the question should be in the form of "ماذا نصت المادة س من قانون ص؟"

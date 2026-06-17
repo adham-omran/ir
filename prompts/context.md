@@ -1,0 +1,4 @@
+- You'll be provided the content as a JSON object,
+  - the key `context` representing surrounding text context.
+  - the key `content` represents the text to make questions for.
+- Utilize the context to create cards for the content, do not make cards about the context, only content.
