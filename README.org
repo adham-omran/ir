@@ -17,9 +17,41 @@ material only* — plain Org headings and Org-roam nodes. The main features are
 *scheduling of material* (a SuperMemo-style topic algorithm) and *in-place
 extraction* of fragments into scheduled child headings.
 
-The current way to create questions and clozes out of the extracts is to write
-them out using [[https://www.github.com/adham-omran/ankifier][ankifier.el]]. PDF incremental reading now lives in a separate
-application and is no longer part of this package.
+Questions and clozes are made out of the extracts in one of two ways: generate
+them from a region with =ir-gen-basic= / =ir-gen-cloze= (OpenAI, via [[https://github.com/karthink/gptel][gptel]]), or
+write them by hand. Either way the result is plain text that [[https://www.github.com/adham-omran/ankifier][ankifier.el]] turns
+into Anki notes. PDF incremental reading now lives in a separate application and
+is no longer part of this package.
+
+* Setup (Doom Emacs)
+1. Declare the packages in =packages.el=. The =:files= directive ships the
+   card-generation prompt templates alongside the code, and =gptel= is the
+   OpenAI client used by =ir-gen-basic= / =ir-gen-cloze=. The =development=
+   branch carries the latest features.
+   #+begin_src emacs-lisp
+   (package! ir :recipe (:host github :repo "adham-omran/ir" :branch "development"
+                         :files (:defaults "prompts")))
+   (package! gptel)
+   #+end_src
+2. Run =~/.emacs.d/bin/doom sync= to install both packages and copy =prompts/=
+   into the build.
+3. Give gptel an OpenAI key via =~/.authinfo= (gptel reads it automatically):
+   #+begin_src text
+   machine api.openai.com login apikey password sk-...
+   #+end_src
+   Then =chmod 600 ~/.authinfo=, since the key is stored in cleartext. gptel's
+   default backend is OpenAI; set =(setq gptel-model 'gpt-4o-mini)= to pick a
+   model.
+4. Optionally bind the commands. Doom example, under the Org localleader:
+   #+begin_src emacs-lisp
+   (after! org
+     (map! :map org-mode-map :localleader
+           (:prefix ("v" . "ir")
+            "s" #'ir-start-session "q" #'ir-end-session
+            "r" #'ir-read-next     "x" #'ir-extract-region
+            "a" #'ir-add           "o" #'ir-open
+            "b" #'ir-gen-basic     "c" #'ir-gen-cloze)))
+   #+end_src
 
 * Tutorial
 ** Add material
@@ -29,7 +61,7 @@ application and is no longer part of this package.
 - While reading in a session, select a region and run =M-x ir-extract-region= to carve it into a scheduled child heading (the parent text is kept).
 
 ** Read on a schedule
-1. =M-x ir-start-session= opens the most-due item and narrows you into it. Run it from anywhere; every other =ir= command requires an active session.
+1. =M-x ir-start-session= opens the most-due item and narrows you into it. Run it from anywhere; every other =ir= command requires an active session, except the importers (=ir-add=, =ir-add-roam-node=, =ir-add-roam-directory=) and the card generators (=ir-gen-basic=, =ir-gen-cloze=). The generators are bundled into this package rather than split out because they are too small to warrant their own.
 2. Read the item. Extract fragments with =ir-extract-region= as you go.
 3. =M-x ir-read-next= records this item (advances its interval) and opens the next. It acts on the item the session opened, wherever point has drifted.
 4. =M-x ir-set-priority= sets the priority of the item under review (0 is highest, 100 lowest); it reorders the queue without rescheduling.
@@ -46,8 +78,47 @@ If =ir-start-session= reports "cannot open ... id not indexed" for Org-roam
 nodes, sync the Org-roam database with =M-x org-roam-db-sync= so the ids
 resolve.
 
+** Generate cards from a region
+Select a region of text, then run =M-x ir-gen-basic= (front/back questions) or
+=M-x ir-gen-cloze= (cloze deletions). The selection is sent to OpenAI and the
+generated cards are inserted as editable plain text right after the region —
+basic cards as =Question? Answer=, clozes with ={{cN::...}}= syntax. Edit them
+as needed, then run ankifier on them to create the Anki notes. These two
+commands work outside a review session.
+
+- A numeric prefix argument sets how many cards to generate: =C-u 5 M-x ir-gen-basic= asks for five. Without one, =ir-gen-card-count= (default 3) applies.
+- Each card is prefixed with the value of the =ir-gen-context-property= Org property (default =IR_CONTEXT=) when set on the heading or file, producing =Context: Question? Answer= for ankifier's context-question form. Unset means no prefix.
+- Set =ir-gen-use-context= to =t= to also send the whole buffer as background context, improving cards for a short selection (the cards are still made only from the selection).
+
+** Other commands
+- =M-x ir-edit= edits one scheduling column (=afactor=, =interval=, =priority=, =due=) of a queued item chosen by title.
+- =M-x ir-validate= reports queued ids whose Org heading no longer exists, without changing anything.
+- =M-x ir-navigate-to-heading= jumps to the heading for the org-id at point, widened then narrowed.
+- =M-x ir-find-item-at-point= echoes the queue row (schedule fields) for the heading at point.
+
+* Customization
+All knobs are =defcustom= variables; set them with =setq= or =M-x customize-group RET ir=.
+
+| Variable                   | Default            | Controls                                            |
+|----------------------------+--------------------+-----------------------------------------------------|
+| =ir-db-location=           | =~/org/ir.db=      | Path to the schedule database.                      |
+| =ir-session-in-new-frame=  | =nil=              | Open sessions in a dedicated fullscreen frame.      |
+| =ir-afactor-increment=     | =0.015=            | How much the A-Factor grows per review.             |
+| =ir-delete-to-trash=       | =t=               | Trash (vs hard-delete) files on =ir-done-and-delete=. |
+| =ir-done-log-file=         | =~/org/ir-done.org= | Completion log; =nil= disables logging.             |
+| =ir-gen-card-count=        | =3=               | Cards requested per generation (prefix arg overrides). |
+| =ir-gen-use-context=       | =nil=              | Send the whole buffer as background context.        |
+| =ir-gen-context-source=    | =buffer=           | Where context comes from (only =buffer= supported). |
+| =ir-gen-context-property=  | =IR_CONTEXT=       | Org property whose value prefixes each card; =nil= disables. |
+
+The card-generation prompts live in =prompts/= (=system.md=, =basic.md=, =cloze.md=, =context.md=, =context-cloze.md=) and can be edited to tune generation.
+
 * Development
 ** Changelog
+- 0.16.0
+  - Add =(ir-gen-basic)= and =(ir-gen-cloze)=: generate basic and cloze cards from the active region via OpenAI, inserted as ankifier-ready text. They run outside a session.
+  - Add the =ir-gen-card-count=, =ir-gen-use-context=, =ir-gen-context-source=, and =ir-gen-context-property= options.
+  - Add the =prompts/= card-generation templates and a =gptel= dependency.
 - 0.15.0
   - Gate the queue behind a session: every command except =(ir-start-session)= and the importers (=(ir-add)=, =(ir-add-roam-node)=, =(ir-add-roam-directory)=) now requires an active session.
   - Add =(ir-set-priority)=: set the priority of the item under review, clamped to [0,100].
@@ -95,10 +166,6 @@ resolve.
   Reset all items to default values.
 ** Possible Features
 - [ ] Batch import.
-** Implementation of question creation
-I see no reason to implement a way to create basic or cloze questions. This is
-not SuperMemo and I've already worked out a way to create basic and cloze cards
-using [[https://www.github.com/adham-omran/ankifier][ankifier.el]].
 ** Why =(ir-open)= deletes other windows?
 Since you are not supposed to manually open material. (ir-open) assumes you want
 to take notes on a specific piece of material. So it sets up the frame for that.
